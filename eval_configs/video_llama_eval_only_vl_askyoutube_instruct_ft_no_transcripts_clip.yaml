@@ -1,0 +1,54 @@
+model:
+  arch: video_llama
+  model_type: pretrain_vicuna
+  freeze_vit: True
+  freeze_qformer: True
+  max_txt_len: 512
+  end_sym: "###"
+  #low_resource: True # False
+  #device_8bit: True
+
+  frozen_llama_proj: False
+
+  # If you want use LLaMA-2-chat,
+  # some ckpts could be download from our provided huggingface repo
+  # i.e.  https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Finetuned
+  #llama_model: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1" #ckpt/vicuna-7b" #"ckpt/vicuna-13b/" or "ckpt/vicuna-7b/" or "ckpt/llama-2-7b-chat-hf"  or "ckpt/llama-2-13b-chat-hf"
+  llama_model: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1" #ckpt/vicuna-7b" #"ckpt/vicuna-13b/" or "ckpt/vicuna-7b/" or "ckpt/llama-2-7b-chat-hf"  or "ckpt/llama-2-13b-chat-hf"
+  #ckpt: "video_llama/output/videollama_stage2_finetune/20231018185/checkpoint_2.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231024133/checkpoint_2.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231026204/checkpoint_2.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231028013/checkpoint_8.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231031015/checkpoint_4.pth"
+  # nfrms 4, 7B
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231101132/checkpoint_9.pth"
+  # nfrms 8, 13B
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231103045/checkpoint_9.pth"
+  # nfrms 16, 7B
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231103182/checkpoint_9.pth"
+  # nframes 4, 7B clip
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231108164/checkpoint_4.pth"
+  # nframes 4, 7B clip
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231108164/checkpoint_5.pth"
+  # nframes 4, 7B clip w/ linear
+  ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231114222/checkpoint_4.pth"
+  equip_audio_branch: False
+
+  fusion_head_layers: 2
+  max_frame_pos: 32
+  fusion_header_type: "seqTransf"
+
+
+datasets:
+  webvid:
+    vis_processor:
+      train:
+        name: "alpro_video_eval"
+        n_frms: 8
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+
+run:
+  task: video_text_pretrain

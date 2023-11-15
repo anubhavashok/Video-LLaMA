@@ -14,7 +14,11 @@ model:
   # some ckpts could be download from our provided huggingface repo
   # i.e.  https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Finetuned
   llama_model: "/mnt/e/llms/oogabooga_model/vicuna-13bv1.1" #ckpt/vicuna-7b" #"ckpt/vicuna-13b/" or "ckpt/vicuna-7b/" or "ckpt/llama-2-7b-chat-hf"  or "ckpt/llama-2-13b-chat-hf"
-  ckpt: "/mnt/g/videollama/Video-LLaMA-Series/finetune-vicuna13b-v2.pth"   # you can use our pretrained ckpt from https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Pretrained/
+  #ckpt: "video_llama/output/videollama_stage2_finetune/20231018185/checkpoint_2.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231024133/checkpoint_2.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231026204/checkpoint_2.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231027044/checkpoint_4.pth"
+  ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231103092/checkpoint_9.pth"
   equip_audio_branch: False
 
   fusion_head_layers: 2

@@ -55,6 +55,33 @@ def load_video(video_path, n_frms=MAX_INT, height=-1, width=-1, sampling="unifor
     msg = f"The video contains {len(indices)} frames sampled at {sec} seconds. "
     return frms, msg
 
+def load_video_all_frames(video_path, frame_sep=4, height=-1, width=-1, return_msg = False):
+    decord.bridge.set_bridge("torch")
+    vr = VideoReader(uri=video_path, height=height, width=width)
+
+    vlen = len(vr)
+    start, end = 0, vlen
+    min_num_frames = min(vlen, 8)
+
+    # Select first frame, then each frame has to be frame_sep seconds apart from each other.
+    n_frms = max(min_num_frames, (vlen / vr.get_avg_fps()) // frame_sep)
+    indices = np.arange(start, end, vlen / n_frms).astype(int).tolist()
+
+    # get_batch -> T, H, W, C
+    temp_frms = vr.get_batch(indices)
+    # print(type(temp_frms))
+    tensor_frms = torch.from_numpy(temp_frms) if type(temp_frms) is not torch.Tensor else temp_frms
+    frms = tensor_frms.permute(3, 0, 1, 2).float()  # (C, T, H, W)
+
+    if not return_msg:
+        return frms
+
+    fps = float(vr.get_avg_fps())
+    sec = ", ".join([str(round(f / fps, 1)) for f in indices])
+    # " " should be added in the start and end
+    msg = f"The video contains {len(indices)} frames sampled at {sec} seconds. "
+    return frms, msg
+
 
 class AlproVideoBaseProcessor(BaseProcessor):
     def __init__(self, mean=None, std=None, n_frms=MAX_INT):

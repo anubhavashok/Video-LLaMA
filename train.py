@@ -12,6 +12,8 @@ import random
 
 import numpy as np
 import torch
+print(torch.cuda.device_count())
+
 import torch.backends.cudnn as cudnn
 
 import video_llama.tasks as tasks
@@ -96,6 +98,8 @@ def main():
     # datasets['webvid']['train'][0]
     # datasets
     model = task.build_model(cfg)
+    device = torch.device("cuda")
+    model = model.cuda()
 
     runner = get_runner_class(cfg)(
         cfg=cfg, job_id=job_id, task=task, model=model, datasets=datasets

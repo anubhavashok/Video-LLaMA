@@ -7,6 +7,7 @@ from video_llama.datasets.builders.base_dataset_builder import BaseDatasetBuilde
 from video_llama.datasets.datasets.laion_dataset import LaionDataset
 from video_llama.datasets.datasets.llava_instruct_dataset import Instruct_Dataset
 from video_llama.datasets.datasets.video_instruct_dataset import Video_Instruct_Dataset
+from video_llama.datasets.datasets.askyoutube_datasets import AskYoutubeInstructDataset
 
 @registry.register_builder("instruct")
 class Instruct_Builder(BaseDatasetBuilder):
@@ -74,5 +75,13 @@ class LlavaInstruct_Builder(Instruct_Builder):
 
     DATASET_CONFIG_DICT = {
         "default": "configs/datasets/instruct/llava_instruct.yaml",
+    }
+
+@registry.register_builder("askyoutube_instruct")
+class AskYoutubeInstruct_Builder(Instruct_Builder):
+    train_dataset_cls = AskYoutubeInstructDataset
+
+    DATASET_CONFIG_DICT = {
+        "default": "configs/datasets/instruct/askyoutube_instruct.yaml",
     }
 

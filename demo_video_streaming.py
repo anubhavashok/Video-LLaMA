@@ -17,6 +17,12 @@ from video_llama.conversation.conversation_video import Chat, Conversation, defa
 import decord
 decord.bridge.set_bridge('torch')
 
+# Import pytube
+# Clean up UI
+# Create video segment selector (or just read video cursor)
+# Use preprocess logic,
+
+
 #%%
 # imports modules for registration
 from video_llama.datasets.builders import *
@@ -101,7 +107,7 @@ def upload_imgorvideo(gr_video, gr_img, text_input, chat_state,chatbot):
         chatbot = chatbot + [((gr_video,), None)]
         chat_state.system =  "You are able to understand the visual content that the user provides. Follow the instructions carefully and explain your answers in detail."
         img_list = []
-        llm_message = chat.upload_video_without_audio(gr_video, chat_state, img_list)
+        llm_message = chat.upload_video_without_audio_preproc_frames(gr_video, chat_state, img_list)
         return gr.update(interactive=False), gr.update(interactive=False), gr.update(interactive=True, placeholder='Type and press Enter'), gr.update(value="Start Chatting", interactive=False), chat_state, img_list,chatbot
     else:
         # img_list = []
@@ -127,6 +133,33 @@ def gradio_answer(chatbot, chat_state, img_list, num_beams, temperature):
     print(chat_state.get_prompt())
     print(chat_state)
     return chatbot, chat_state, img_list
+
+def process_video(input_video):
+    cap = cv2.VideoCapture(input_video)
+
+    output_path = "output.mp4"
+
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    video = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+
+    iterating, frame = cap.read()
+    while iterating:
+
+        # flip frame vertically
+        frame = cv2.flip(frame, 0)
+        display_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        video.write(frame)
+        yield display_frame, None
+
+        iterating, frame = cap.read()
+
+    video.release()
+    yield display_frame, output_path
+
 
 title = """
 <h1 align="center"><a href="https://github.com/DAMO-NLP-SG/Video-LLaMA"><img src="https://s1.ax1x.com/2023/05/22/p9oQ0FP.jpg", alt="Video-LLaMA" border="0" style="margin: 0 auto; height: 200px;" /></a> </h1>
@@ -187,7 +220,7 @@ with gr.Blocks() as demo:
 
     with gr.Row():
         with gr.Column(scale=0.5):
-            video = gr.Video()
+            video = gr.Video(sources=['webcam'])
             image = gr.Image(type="filepath")
             gr.Markdown(case_note_upload)
 

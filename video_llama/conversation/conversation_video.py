@@ -16,7 +16,7 @@ from enum import auto, Enum
 from typing import List, Tuple, Any
 import os
 from video_llama.common.registry import registry
-from video_llama.processors.video_processor import ToTHWC,ToUint8,load_video
+from video_llama.processors.video_processor import ToTHWC,ToUint8,load_video,load_video_all_frames
 from video_llama.processors import Blip2ImageEvalProcessor
             
 from video_llama.models.ImageBind.data import load_and_transform_audio_data
@@ -229,9 +229,34 @@ class Chat:
             output_text = output_text.split(conv.roles[1]+':')[-1].strip()
         conv.messages[-1][1] = output_text
         return output_text, output_token.cpu().numpy()
-    
-    def upload_video(self, video_path, conv, img_list):
 
+    def upload_video_without_audio_preproc_frames(self, video_path, conv, img_list):
+        msg = ""
+        if isinstance(video_path, str):  # is a video path
+            ext = os.path.splitext(video_path)[-1].lower()
+            print(video_path)
+            # image = self.vis_processor(image).unsqueeze(0).to(self.device)
+            video, msg = load_video_all_frames(
+                    video_path=video_path,
+                    frame_sep=4,
+                    height=224,
+                    width=224,
+                    return_msg = True
+            )
+            video = self.vis_processor.transform(video)
+            video = video.unsqueeze(0).to(self.device)
+            # print(image)
+        else:
+            raise NotImplementedError
+        
+        # conv.system = "You can understand the video that the user provides. Follow the instructions carefully and explain your answers in detail."
+        image_emb, _ = self.model.encode_videoQformer_visual(video)
+        img_list.append(image_emb)
+        conv.append_message(conv.roles[0], "<Video><ImageHere></Video> "+ msg)
+        return "Received."
+
+
+    def upload_video(self, video_path, conv, img_list):
         msg = ""
         if isinstance(video_path, str):  # is a video path
             ext = os.path.splitext(video_path)[-1].lower()
@@ -285,7 +310,7 @@ class Chat:
             # image = self.vis_processor(image).unsqueeze(0).to(self.device)
             video, msg = load_video(
                 video_path=video_path,
-                n_frms=8,
+                n_frms=32,
                 height=224,
                 width=224,
                 sampling ="uniform", return_msg = True
@@ -328,7 +353,9 @@ class Chat:
 
     def get_context_emb(self, conv, img_list):
         prompt = conv.get_prompt()
+        print('Prompt: ', prompt)
         prompt_segs = prompt.split('<ImageHere>')
+        print(prompt_segs, img_list)
         assert len(prompt_segs) == len(img_list) + 1, "Unmatched numbers of image placeholders and images."
         seg_tokens = [
             self.model.llama_tokenizer(

@@ -17,6 +17,12 @@ from video_llama.conversation.conversation_video import Chat, Conversation, defa
 import decord
 decord.bridge.set_bridge('torch')
 
+# Import pytube
+# Clean up UI
+# Create video segment selector (or just read video cursor)
+# Use preprocess logic,
+
+
 #%%
 # imports modules for registration
 from video_llama.datasets.builders import *
@@ -101,7 +107,7 @@ def upload_imgorvideo(gr_video, gr_img, text_input, chat_state,chatbot):
         chatbot = chatbot + [((gr_video,), None)]
         chat_state.system =  "You are able to understand the visual content that the user provides. Follow the instructions carefully and explain your answers in detail."
         img_list = []
-        llm_message = chat.upload_video_without_audio(gr_video, chat_state, img_list)
+        llm_message = chat.upload_video_without_audio_preproc_frames(gr_video, chat_state, img_list)
         return gr.update(interactive=False), gr.update(interactive=False), gr.update(interactive=True, placeholder='Type and press Enter'), gr.update(value="Start Chatting", interactive=False), chat_state, img_list,chatbot
     else:
         # img_list = []
