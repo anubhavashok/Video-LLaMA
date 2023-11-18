@@ -31,7 +31,9 @@ model:
   # nframes 4, 7B clip
   #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231108164/checkpoint_5.pth"
   # nframes 4, 7B clip w/ linear
-  ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231114222/checkpoint_4.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231114222/checkpoint_4.pth"
+  # nframes 4, 7B clip only loss, no transcripts
+  ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231117180/checkpoint_4.pth"
   equip_audio_branch: False
 
   fusion_head_layers: 2

@@ -35,9 +35,11 @@ class AskYoutubeDataset(BaseDataset):
 
         ts_df = []
         joined_captions = []
-        for video_id in os.listdir(ann_root):
-            captions_file = os.path.join(ann_root, video_id, 'chunked_captions.json')
-            if not os.path.exists(captions_file):
+        self.video_paths = dict([(path.split('/')[-1], path) for path in glob.glob(os.path.join(vis_root, '*'))])
+        captions_files = glob.glob(os.path.join(ann_root, '*', 'chunked_captions_30s.json'))
+        for captions_file in captions_files:
+            video_id = os.path.dirname(captions_file).split('/')[-1]
+            if video_id not in self.video_paths:
                 continue
             captions = json.load(open(captions_file, 'r'))
             # combine captions.
@@ -47,6 +49,18 @@ class AskYoutubeDataset(BaseDataset):
                     cap += ''.join([s['utf8'] for s in seg['segs']])
                 m = {'video_id': video_id, 'seq_num': i, 'caption': cap}
                 joined_captions.append(pd.DataFrame.from_dict([m]))
+        #for video_id in os.listdir(ann_root):
+        #    captions_file = os.path.join(ann_root, video_id, 'chunked_captions.json')
+        #    if not os.path.exists(captions_file):
+        #        continue
+        #    captions = json.load(open(captions_file, 'r'))
+        #    # combine captions.
+        #    for i, chunk in enumerate(captions):
+        #        cap = ''
+        #        for seg in chunk:
+        #            cap += ''.join([s['utf8'] for s in seg['segs']])
+        #        m = {'video_id': video_id, 'seq_num': i, 'caption': cap}
+        #        joined_captions.append(pd.DataFrame.from_dict([m]))
 
         merged_df = pd.concat(joined_captions)
         self.annotation = merged_df
@@ -55,13 +69,22 @@ class AskYoutubeDataset(BaseDataset):
         self.num_frm = 8
         self.frm_sampling_strategy = 'headtail'
 
+    #def _get_video_path(self, sample):
+    #    video_id, i, cap = sample.values()
+    #    video_glob = os.path.join(self.vis_root, video_id, f'chunk_{i}.mp4')
+    #    video_path = glob.glob(video_glob)[0]
+    #    if not os.path.exists(video_path):
+    #        print(f"Video path: {video_path} doesn't exist")
+    #        exit()
+    #    return video_path
+
     def _get_video_path(self, sample):
         video_id, i, cap = sample.values()
-        video_glob = os.path.join(self.vis_root, video_id, f'chunk_{i}.mp4')
+        video_glob = os.path.join(self.video_paths[video_id], f'chunk_{i}.mp4')
+        if len(glob.glob(video_glob)) == 0:
+            print(f"Video path: {video_glob} doesn't exist")
+            return None
         video_path = glob.glob(video_glob)[0]
-        if not os.path.exists(video_path):
-            print(f"Video path: {video_path} doesn't exist")
-            exit()
         return video_path
 
     def __getitem__(self, index):
@@ -136,8 +159,6 @@ class AskYoutubeInstructDataset(BaseDataset):
             video_id = os.path.dirname(captions_file).split('/')[-1]
             if video_id not in self.video_paths:
                 continue
-            if not os.path.exists(captions_file):
-                continue
             captions = json.load(open(captions_file, 'r'))
             # combine captions.
             for i, chunk in enumerate(captions):
@@ -182,11 +203,10 @@ class AskYoutubeInstructDataset(BaseDataset):
         video_glob = os.path.join(self.video_paths[video_id], f'chunk_{i}.mp4')
         #video_glob = os.path.join(self.vis_root, video_id, f'chunk_{i}.mp4')
         #if not os.path.exists(video_path):
-        try:
-            video_path = glob.glob(video_glob)[0]
-        except:
+        if len(glob.glob(video_glob)) == 0:
             print(f"Video path: {video_glob} doesn't exist")
             return None
+        video_path = glob.glob(video_glob)[0]
         return video_path
     
     def create_conversation_list(self, sample_dict, use_transcripts=True):
@@ -197,6 +217,9 @@ class AskYoutubeInstructDataset(BaseDataset):
             prompt = f"Answer the questions given the following transcript: {transcript}\n\n"
         else:
             prompt = f"Answer the questions from the video:\n\n"
+        if len(qa) == 0:
+            print('Empty QA')
+            return []
         qa[0]['q'] = prompt + qa[0]['q']
         return qa
 
@@ -212,7 +235,11 @@ class AskYoutubeInstructDataset(BaseDataset):
             # if os.path.exists(video_path):
             try:
                 video_path = self._get_video_path(sample_dict)
+                if video_path is None:
+                    continue
                 conversation_list = self.create_conversation_list(sample_dict, self.use_transcripts)
+                if len(conversation_list) == 0:
+                    continue
                 video, msg = load_video(
                     video_path=video_path,
                     n_frms=self.num_frm,
