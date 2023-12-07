@@ -49,7 +49,7 @@ model:
   
 
 datasets:    
-  askyoutube:
+  askyoutube_instruct:
     data_type: video
     build_info:
       anno_dir: /mnt/g/video_caption_dataset/*/*/data/captions/
@@ -57,12 +57,12 @@ datasets:
     vis_processor:
       train:
         name: "alpro_video_train"
-        n_frms: 16
+        n_frms: 4
         image_size: 224
     text_processor:
       train:
         name: "blip_caption"
-    num_video_query_token: 32
+    num_video_query_token:  
     tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
     model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
     
@@ -75,25 +75,22 @@ run:
   warmup_lr: 1e-6
 
   weight_decay: 0.05
-  max_epoch: 10
-  iters_per_epoch: 500
-  batch_size_train: 32
+  max_epoch: 20
+  iters_per_epoch: 1000
+  batch_size_train: 16
   batch_size_eval: 1
   num_workers: 8
-  warmup_steps: 50 #1000
+  warmup_steps: 1000
 
   seed: 42
-  output_dir: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune"
+  output_dir: "output/videollama_stage2_finetune"
 
   amp: True
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231112022/checkpoint_3.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231027044/checkpoint_4.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231023163/checkpoint_1.pth" #null
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231030154/checkpoint_2.pth"
-  #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231117180/checkpoint_4.pth"
-  #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231119001/checkpoint_2.pth"
-  #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231122124/checkpoint_4.pth"
-  #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231123014/checkpoint_6.pth"
+  #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231031015/checkpoint_7.pth"
 
   evaluate: False 
   train_splits: ["train"]

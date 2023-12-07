@@ -9,10 +9,14 @@ Adapted from salesforce@LAVIS and Vision-CAIR@MiniGPT-4. Below is the original c
 import argparse
 import os
 import random
+import multiprocessing
 
 import numpy as np
 import torch
 print(torch.cuda.device_count())
+
+import cv2
+cv2.setNumThreads(0)
 
 import torch.backends.cudnn as cudnn
 
@@ -108,4 +112,6 @@ def main():
 
 
 if __name__ == "__main__":
+    torch.multiprocessing.set_sharing_strategy('file_system')
+    multiprocessing.set_start_method('forkserver')
     main()

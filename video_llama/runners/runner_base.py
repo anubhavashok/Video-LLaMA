@@ -88,7 +88,7 @@ class RunnerBase:
             if self.use_distributed:
                 if self._wrapped_model is None:
                     self._wrapped_model = DDP(
-                        self._model, device_ids=[self.config.run_cfg.gpu]
+                        self._model, device_ids=[self.config.run_cfg.gpu], find_unused_parameters=True
                     )
             else:
                 self._wrapped_model = self._model
@@ -265,7 +265,7 @@ class RunnerBase:
 
             dataloaders = self.create_loaders(
                 datasets=datasets,
-                num_workers=self.config.run_cfg.num_workers,
+                num_workers=0,#self.config.run_cfg.num_workers,
                 batch_sizes=batch_sizes,
                 is_trains=is_trains,
                 collate_fns=collate_fns,
@@ -513,7 +513,8 @@ class RunnerBase:
                         dataset,
                         batch_size=bsz,
                         num_workers=num_workers,
-                        pin_memory=True,
+                        pin_memory=False,
+                        #persistent_workers=True,
                     )
                 )
             else:
@@ -536,7 +537,8 @@ class RunnerBase:
                     dataset,
                     batch_size=bsz,
                     num_workers=num_workers,
-                    pin_memory=True,
+                    pin_memory=False,
+                    #persistent_workers=True,
                     sampler=sampler,
                     shuffle=sampler is None and is_train,
                     collate_fn=collate_fn,

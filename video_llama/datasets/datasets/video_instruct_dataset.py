@@ -55,7 +55,7 @@ class Video_Instruct_Dataset(BaseDataset):
         self.num_video_query_token = num_video_query_token
         self.vis_root = vis_root
         self.resize_size = 224
-        self.num_frm = 8
+        self.num_frm = self.vis_processor.n_frms #16 #8
         self.tokenizer = LlamaTokenizer.from_pretrained(tokenizer_name, use_fast=False)
         self.tokenizer.pad_token = self.tokenizer.unk_token
         self.tokenizer.add_tokens([DEFAULT_IMAGE_PATCH_TOKEN], special_tokens=True)
@@ -73,14 +73,21 @@ class Video_Instruct_Dataset(BaseDataset):
         return full_video_fp
 
     def __getitem__(self, index):
+        #print('In get item')
         num_retries = 10  # skip error videos
         for _ in range(num_retries):
+            #print('Trying')
             try:
+                #print('Before sample')
                 sample = self.annotation[index]
+                #print('In sample')
 
                 video_path = self._get_video_path(sample)
+                #print('sample: ', sample)
+                #print('sample.keys(): ', sample.keys())
                 conversation_list = sample['QA']
 
+                #print('Loading video')
                 video, msg = load_video(
                     video_path=video_path,
                     n_frms=self.num_frm,
@@ -88,12 +95,15 @@ class Video_Instruct_Dataset(BaseDataset):
                     width=self.resize_size,
                     sampling ="uniform", return_msg = True
                 )
+                #print('Loaded video')
                 video = self.transform(video)
+                #print('Processed video')
                 if 'cn' in self.data_type:
                     msg = ""
                 # 添加视频<DEFAULT_IMAGE_PATCH_TOKEN>,以及msg到convsation list 0
                 sources = preprocess_multimodal(copy.deepcopy(conversation_list), None, cur_token_len=self.num_video_query_token,msg = msg)
                 new_sources = convert_source_vicuna_format(sources)
+                #print('Converted sources')
                 
                 if self.model_type =='vicuna':
                     data_dict = preprocess(
@@ -106,11 +116,14 @@ class Video_Instruct_Dataset(BaseDataset):
                 else:
                     print('not support')
                     raise('not support')
+                #print('Preprocessed')
                 data_dict = dict(input_ids=data_dict["input_ids"][0],
+                                texts=data_dict["texts"][0],
                                 labels=data_dict["labels"][0])
                 # image exist in the data
                 data_dict['image'] = video
-            except:
+            except Exception as e:
+                print('Exception: ', e)
                 print(f"Failed to load examples with video: {video_path}. "
                             f"Will randomly sample an example as a replacement.")
                 index = random.randint(0, len(self) - 1)
@@ -122,6 +135,7 @@ class Video_Instruct_Dataset(BaseDataset):
         return {
             "image": video,
             "text_input": data_dict["input_ids"],
+            "texts": data_dict["texts"],
             "labels": data_dict["labels"],
             "type":'video',
         }
@@ -142,6 +156,7 @@ class Video_Instruct_Dataset(BaseDataset):
         batch = dict(
             input_ids=input_ids,
             labels=labels,
+            texts=[instance['texts'] for instance in instances],
             attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
         )
 
@@ -224,11 +239,14 @@ def _tokenize_fn(strings: Sequence[str],
         tokenized.input_ids.ne(tokenizer.pad_token_id).sum().item()
         for tokenized in tokenized_list
     ]
+
+    texts = tokenizer.batch_decode(input_ids)
     return dict(
         input_ids=input_ids,
         labels=labels,
         input_ids_lens=input_ids_lens,
         labels_lens=labels_lens,
+        texts = texts
     )
 
 def preprocess(
@@ -244,13 +262,17 @@ def preprocess(
     """
     # add end signal and concatenate together
     conversations = []
+    #print('Before source')
     for source in sources:
         header = f"{video_conversation.system}\n\n"
         conversation = _add_speaker_and_signal(header, source)
         conversations.append(conversation)
+    #print('Conversations')
     # tokenize conversations
     conversations_tokenized = _tokenize_fn(conversations, tokenizer)
     input_ids = conversations_tokenized["input_ids"]
+    #print('conversations_tokenized.keys(): ', conversations_tokenized.keys())
+    texts = conversations_tokenized["texts"]
     targets = copy.deepcopy(input_ids)
     for target, source in zip(targets, sources):
         tokenized_lens = _tokenize_fn([header] + [s["value"] for s in source],
@@ -258,7 +280,7 @@ def preprocess(
         speakers = [sentence["from"] for sentence in source]
         _mask_targets(target, tokenized_lens, speakers)
 
-    return dict(input_ids=input_ids, labels=targets)
+    return dict(input_ids=input_ids, texts=texts, labels=targets)
 
 def preprocess_for_llama_v2(
     sources: Sequence[str],

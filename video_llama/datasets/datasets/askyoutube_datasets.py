@@ -34,60 +34,48 @@ class AskYoutubeDataset(BaseDataset):
         super().__init__(vis_processor=vis_processor, text_processor=text_processor)
 
         ts_df = []
-        joined_captions = []
-        self.video_paths = dict([(path.split('/')[-1], path) for path in glob.glob(os.path.join(vis_root, '*'))])
+
+        self.video_paths = self._load_video_paths(vis_root)
+        self.annotation = self._load_annotations(ann_root) 
+        self.vis_root = vis_root
+        self.resize_size = 224
+        self.num_frm = self.vis_processor.n_frms
+        self.frm_sampling_strategy = 'headtail'
+
+    def _load_video_paths(self, vis_root):
+        return dict([(path.split('/')[-1], path) for path in glob.glob(os.path.join(vis_root, '*'))])
+
+    def _load_annotations(self, ann_root):
         captions_files = glob.glob(os.path.join(ann_root, '*', 'chunked_captions_30s.json'))
+        all_captions = []
         for captions_file in captions_files:
             video_id = os.path.dirname(captions_file).split('/')[-1]
             if video_id not in self.video_paths:
                 continue
-            captions = json.load(open(captions_file, 'r'))
+            with open(captions_file, 'r') as f:
+                captions = json.load(f)
             # combine captions.
             for i, chunk in enumerate(captions):
+                #cap = '\n'.join(['\n'.join([s['utf8'] for s in seg['segs']]) for seg in chunk])
                 cap = ''
                 for seg in chunk:
-                    cap += ''.join([s['utf8'] for s in seg['segs']])
+                    if "dDurationMs" not in seg or ('aAppend' in seg and seg['aAppend']):
+                        continue
+                    cap += '\n' + ''.join([s['utf8'] for s in seg['segs']])
+                cap = cap.replace('\n\n\n', '\n')
+                cap = cap.replace('\n\n', '\n')
                 m = {'video_id': video_id, 'seq_num': i, 'caption': cap}
-                joined_captions.append(pd.DataFrame.from_dict([m]))
-        #for video_id in os.listdir(ann_root):
-        #    captions_file = os.path.join(ann_root, video_id, 'chunked_captions.json')
-        #    if not os.path.exists(captions_file):
-        #        continue
-        #    captions = json.load(open(captions_file, 'r'))
-        #    # combine captions.
-        #    for i, chunk in enumerate(captions):
-        #        cap = ''
-        #        for seg in chunk:
-        #            cap += ''.join([s['utf8'] for s in seg['segs']])
-        #        m = {'video_id': video_id, 'seq_num': i, 'caption': cap}
-        #        joined_captions.append(pd.DataFrame.from_dict([m]))
+                if not self._check_video_chunk_exists(video_id, i):
+                    continue
+                all_captions.append({'video_id': video_id, 'seq_num': i, 'caption': cap})
+        return pd.DataFrame(all_captions)
 
-        merged_df = pd.concat(joined_captions)
-        self.annotation = merged_df
-        self.vis_root = vis_root
-        self.resize_size = 224
-        self.num_frm = 8
-        self.frm_sampling_strategy = 'headtail'
-
-    #def _get_video_path(self, sample):
-    #    video_id, i, cap = sample.values()
-    #    video_glob = os.path.join(self.vis_root, video_id, f'chunk_{i}.mp4')
-    #    video_path = glob.glob(video_glob)[0]
-    #    if not os.path.exists(video_path):
-    #        print(f"Video path: {video_path} doesn't exist")
-    #        exit()
-    #    return video_path
-
-    def _get_video_path(self, sample):
-        video_id, i, cap = sample.values()
-        video_glob = os.path.join(self.video_paths[video_id], f'chunk_{i}.mp4')
-        if len(glob.glob(video_glob)) == 0:
-            print(f"Video path: {video_glob} doesn't exist")
-            return None
-        video_path = glob.glob(video_glob)[0]
-        return video_path
+    def _check_video_chunk_exists(self, video_id, i):
+        video_path = os.path.join(self.video_paths[video_id], f'chunk_{i}.mp4')
+        return os.path.exists(video_path)
 
     def __getitem__(self, index):
+        #index = index % 2
         num_retries = 10  # skip error videos
         for _ in range(num_retries):
             sample = self.annotation.iloc[index]
@@ -102,7 +90,9 @@ class AskYoutubeDataset(BaseDataset):
                 raise NotImplementedError("Un-supported text annotation format.")
 
             # fetch video
-            video_path = self._get_video_path(sample_dict) 
+            i = sample_dict['seq_num']
+            #print(index, self.video_paths[video_id], i)
+            video_path = os.path.join(self.video_paths[video_id], f'chunk_{i}.mp4')
             # if os.path.exists(video_path):
             try:
                 video = self.vis_processor(video_path)
@@ -129,6 +119,7 @@ class AskYoutubeDataset(BaseDataset):
         return {
             "image": video,
             "text_input": caption,
+            'texts': text,
             "type":'video',
         }
 
@@ -184,7 +175,7 @@ class AskYoutubeInstructDataset(BaseDataset):
         self.annotation = merged_df
         self.vis_root = vis_root
         self.resize_size = 224
-        self.num_frm = 4
+        self.num_frm = self.vis_processor.n_frms
         self.num_video_query_token = num_video_query_token
         self.tokenizer = LlamaTokenizer.from_pretrained(tokenizer_name, use_fast=False)
         self.tokenizer.pad_token = self.tokenizer.unk_token
@@ -218,17 +209,18 @@ class AskYoutubeInstructDataset(BaseDataset):
         else:
             prompt = f"Answer the questions from the video:\n\n"
         if len(qa) == 0:
-            print('Empty QA')
+            #print('Empty QA')
             return []
         qa[0]['q'] = prompt + qa[0]['q']
         return qa
 
     def __getitem__(self, index):
-        num_retries = 10  # skip error videos
+        num_retries = 100  # skip error videos
         for _ in range(num_retries):
             sample = self.annotation.iloc[index]
             sample_dict = sample.to_dict()
             video_id = sample_dict['video_id']
+            data_dict = dict()
 
             # fetch video
             #print(sample_dict)
@@ -236,9 +228,13 @@ class AskYoutubeInstructDataset(BaseDataset):
             try:
                 video_path = self._get_video_path(sample_dict)
                 if video_path is None:
+                    index = random.randint(0, len(self) - 1)
+                    #print('Empty video path')
                     continue
                 conversation_list = self.create_conversation_list(sample_dict, self.use_transcripts)
                 if len(conversation_list) == 0:
+                    index = random.randint(0, len(self) - 1)
+                    #print('Empty conversation list')
                     continue
                 video, msg = load_video(
                     video_path=video_path,
@@ -264,23 +260,25 @@ class AskYoutubeInstructDataset(BaseDataset):
                         new_sources,
                         self.tokenizer)
                 
-                #print('Preprocessed')
+                #print('Preprocessed', data_dict.keys(), video is None)
                 data_dict = dict(input_ids=data_dict["input_ids"][0],
                                 texts=data_dict["texts"][0],
                                 labels=data_dict["labels"][0])
+                #print('Converted to data_dict: ', video)
                 # image exist in the data
                 data_dict['image'] = video
+                #print('Added video to data_dict: ', video)
                 #print(new_sources)
             except Exception as e:
                 print(e)
-                print(f"Failed to load examples with video: {video_path}. "
+                print(f"Failed to load examples with video: {video_path}. Exception"
                             f"Will randomly sample an example as a replacement.")
                 index = random.randint(0, len(self) - 1)
                 continue
 
             if video is None \
                     or video.size()!=torch.Size([3,self.vis_processor.n_frms,224,224]):
-                print(f"Failed to load examples with video: {video_path}. "
+                print(f"Failed to load examples with video: {video_path}. Video is None. "
                             f"Will randomly sample an example as a replacement.")
                 print(video.size(), self.vis_processor.n_frms)
                 index = random.randint(0, len(self) - 1)
@@ -290,6 +288,7 @@ class AskYoutubeInstructDataset(BaseDataset):
         else:  
             raise RuntimeError(f"Failed to fetch video after {num_retries} retries.")
         # "image_id" is kept to stay compatible with the COCO evaluation format
+        #print(data_dict["texts"])
         return {
             "image": video,
             "text_input": data_dict["input_ids"],
@@ -483,3 +482,10 @@ class WebvidDatasetEvalDataset(BaseDataset):
         }
 
 
+if __name__ == '__main__':
+    from video_llama.processors.base_processor import BaseProcessor
+    vis_root = '/mnt/g/video_caption_dataset/*/*/data/chunked_videos_30s/'
+    ann_root = '/mnt/g/video_caption_dataset/*/*/data/captions/'
+    vis_processor = BaseProcessor()
+    text_processor = BaseProcessor()
+    dataset = AskYoutubeDataset(vis_processor, text_processor, vis_root, ann_root)

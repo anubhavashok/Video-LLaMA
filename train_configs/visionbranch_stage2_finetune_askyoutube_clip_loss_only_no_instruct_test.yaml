@@ -57,7 +57,7 @@ datasets:
     vis_processor:
       train:
         name: "alpro_video_train"
-        n_frms: 16
+        n_frms: 8
         image_size: 224
     text_processor:
       train:
@@ -76,8 +76,8 @@ run:
 
   weight_decay: 0.05
   max_epoch: 10
-  iters_per_epoch: 500
-  batch_size_train: 32
+  iters_per_epoch: 1000
+  batch_size_train: 16 #32
   batch_size_eval: 1
   num_workers: 8
   warmup_steps: 50 #1000
@@ -94,6 +94,7 @@ run:
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231119001/checkpoint_2.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231122124/checkpoint_4.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231123014/checkpoint_6.pth"
+  resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231130031/checkpoint_2.pth"
 
   evaluate: False 
   train_splits: ["train"]

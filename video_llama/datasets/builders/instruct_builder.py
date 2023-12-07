@@ -86,3 +86,13 @@ class AskYoutubeInstruct_Builder(Instruct_Builder):
         "default": "configs/datasets/instruct/askyoutube_instruct.yaml",
     }
 
+
+@registry.register_builder("videochatgpt_instruct")
+class VideochatgptInstruct_Builder(Instruct_Builder):
+    train_dataset_cls = Video_Instruct_Dataset
+
+    DATASET_CONFIG_DICT = {
+        "default": "configs/datasets/instruct/videochatgpt_instruct.yaml",
+    }
+
+

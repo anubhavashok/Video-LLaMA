@@ -6,6 +6,7 @@
 """
 
 import os
+import glob
 from video_llama.datasets.datasets.base_dataset import BaseDataset
 from video_llama.datasets.datasets.caption_datasets import CaptionDataset
 import pandas as pd
@@ -26,21 +27,30 @@ class WebvidDataset(BaseDataset):
 
         # 读取一个路径下所有的
 
+        self.vis_root = vis_root
         ts_df = []
+        existing_videos_path = '/mnt/f/videollama/datasets/webvid/existing_videos.txt'
+        self.existing_videos = set(open(existing_videos_path, 'r').read().splitlines())
+        #self.existing_videos = set([v.split('videos/')[1] for v in self.existing_videos])
         for file_name in os.listdir(ann_root):
             if file_name.endswith('.csv'):
                 df = pd.read_csv(os.path.join(ann_root, file_name))
+                print('Before: ', len(df.index))
+                #df = df.apply(lambda x: os.path.exists(self._get_video_path(x)), axis=1)
+                print(df.apply(lambda x: self._get_video_path(x) in self.existing_videos, axis=1).sum())
+                df = df[df.apply(lambda x: self._get_video_path(x) in self.existing_videos, axis=1)]
+                print('After: ', len(df.index))
                 ts_df.append(df)
+
 
         merged_df = pd.concat(ts_df)
         self.annotation = merged_df
-        self.vis_root = vis_root
         self.resize_size = 224
         self.num_frm = 8
         self.frm_sampling_strategy = 'headtail'
 
     def _get_video_path(self, sample):
-        rel_video_fp = os.path.join(sample['page_dir'], str(sample['videoid']) + '.mp4')
+        rel_video_fp = os.path.join(str(sample['page_dir']), str(sample['videoid']) + '.mp4')
         full_video_fp = os.path.join(self.vis_root,  rel_video_fp)
         return full_video_fp
 
@@ -58,6 +68,11 @@ class WebvidDataset(BaseDataset):
 
             # fetch video
             video_path = self._get_video_path(sample_dict) 
+            #if video_path not in self.existing_videos:
+            #    print(video_path, self.existing_videos[0])
+            #    print('Skipping')
+            #    continue
+            #print('Found')
             # if os.path.exists(video_path):
             try:
                 video = self.vis_processor(video_path)
@@ -82,6 +97,7 @@ class WebvidDataset(BaseDataset):
         # "image_id" is kept to stay compatible with the COCO evaluation format
         return {
             "image": video,
+            'texts': text,
             "text_input": caption,
             "type":'video',
         }

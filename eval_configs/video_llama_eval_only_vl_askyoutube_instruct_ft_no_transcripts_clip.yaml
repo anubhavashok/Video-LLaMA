@@ -33,12 +33,25 @@ model:
   # nframes 4, 7B clip w/ linear
   #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231114222/checkpoint_4.pth"
   # nframes 4, 7B clip only loss, no transcripts
-  ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231117180/checkpoint_4.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231117180/checkpoint_4.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231121034/checkpoint_22.pth"
+  # nframes 16, 7B clip only loss, no transcripts
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231123224/checkpoint_9.pth"
+  #ckpt: '/mnt/g/videollama/Video-LLaMA-Series/pretrain_vicuna7b-v2.pth'
+  #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231130105/checkpoint_9.pth'
+  #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231202103/checkpoint_9.pth'
+  #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231205235/checkpoint_6.pth'
+  #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231204113/checkpoint_9.pth'
+  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207011/checkpoint_9.pth'
+
   equip_audio_branch: False
 
   fusion_head_layers: 2
   max_frame_pos: 32
   fusion_header_type: "seqTransf"
+
+  use_clip_loss: True
+  clip_dim_size: 1024
 
 
 datasets:

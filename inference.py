@@ -152,8 +152,8 @@ def upload_video(model, video_path, vis_processor, conv, img_list, output_video_
 
 def get_text_embedding_qformer(prompt, model):
     inputs = model.tokenizer(prompt, return_tensors='pt').to('cuda')
-    #embds = model.video_Qformer.bert(inputs['input_ids']).last_hidden_state
-    embds = model.Qformer.bert(inputs['input_ids']).last_hidden_state
+    embds = model.video_Qformer.bert(inputs['input_ids']).last_hidden_state
+    #embds = model.Qformer.bert(inputs['input_ids']).last_hidden_state
     embds = F.normalize(model.text_proj(embds[:, 0, :]), dim=-1)
     return embds
 
@@ -254,11 +254,12 @@ def compute_dist_clip(text_emb, video_embs):
         #sim = sim.squeeze()
         sim_q2t = torch.einsum("iqf,tf->itq", video_emb, text_emb)
         sim_t2q = torch.einsum("tf,iqf->tiq", text_emb, video_emb)
-        sim = (sim_q2t + sim_t2q)/2
+        #sim = (sim_q2t + sim_t2q)/2
+        sim = sim_q2t
         #sim = (sim_q2t.max(-1)[0] + sim_t2q.max(-1)[0])/2
         #print(sim.size())
-        #dist = sim.max(-1)
-        dist = sim.mean(-1)
+        dist = sim.max(-1)
+        #dist = sim.mean(-1)
         #dist = sim
         dists.append(dist)
     return dists
@@ -331,14 +332,14 @@ if __name__ == '__main__':
 
     model, vis_processor = init(args)
     # Run video llama model with sample video.
-    video_paths = glob.glob('examples/*.mp4')
-    #video_paths = glob.glob('/mnt/g/video_caption_dataset/education/national_geographic/data/chunked_videos_30s/*/*.mp4')[-150:-50]
+    #video_paths = glob.glob('examples/*.mp4')
+    video_paths = glob.glob('/mnt/g/video_caption_dataset/education/national_geographic/data/chunked_videos_30s/*/*.mp4')[-160:-40]
     print(video_paths)
     #video_paths = video_paths[:100]
     #prompt = 'Does this video have a dog in it?'
     #prompt = 'This video has a dog in it.'
-    #prompt = 'This video has a snake in it.'
-    prompt = 'dog'
+    prompt = 'This video has a cobra in it.'
+    #prompt = 'cobra'
     #prompt = '<Video>'
     text_emb = get_text_embedding_qformer(prompt, model)
     print(text_emb.size())

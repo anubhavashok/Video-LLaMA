@@ -49,11 +49,11 @@ model:
   
 
 datasets:    
-  askyoutube:
+  webvid:
     data_type: video
     build_info:
-      anno_dir: /mnt/g/video_caption_dataset/*/*/data/captions/
-      videos_dir: /mnt/g/video_caption_dataset/*/*/data/chunked_videos_30s/
+      anno_dir: /mnt/f/videollama/datasets/webvid/results_2M_train_1/
+      videos_dir: /mnt/f/videollama/datasets/webvid/data/videos
     vis_processor:
       train:
         name: "alpro_video_train"
@@ -62,7 +62,7 @@ datasets:
     text_processor:
       train:
         name: "blip_caption"
-    num_video_query_token: 32
+    sample_ratio: 100
     tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
     model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
     

@@ -24,11 +24,19 @@ model:
   #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231101132/checkpoint_9.pth"
   # nfrms 8, 13B
   #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231103045/checkpoint_9.pth"
-  # nfrms 16, 7B epoch 10
+  # nfrms 16, 7B
   #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231103182/checkpoint_9.pth"
-  # nfrms 16, 7B epoch 7
-  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231103182/checkpoint_6.pth"
-  ckpt: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231205005/checkpoint_0.pth"
+  # nframes 4, 7B clip
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231108164/checkpoint_4.pth"
+  # nframes 4, 7B clip
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231108164/checkpoint_5.pth"
+  # nframes 4, 7B clip w/ linear
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231114222/checkpoint_4.pth"
+  # nframes 4, 7B clip only loss, no transcripts
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231117180/checkpoint_4.pth"
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231121034/checkpoint_22.pth"
+  # nframes 16, 7B clip only loss, no transcripts
+  #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231123224/checkpoint_9.pth"
   equip_audio_branch: False
 
   fusion_head_layers: 2
