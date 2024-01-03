@@ -46,7 +46,10 @@ model:
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231214234/checkpoint_2.pth'
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231213021/checkpoint_8.pth'
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231213021/checkpoint_9.pth'
-  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231214234/checkpoint_9.pth'
+  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231230104/checkpoint_14.pth'
+  #'/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231230104/checkpoint_12.pth'
+  #'/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231228014/checkpoint_5.pth'
+  #/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231222201/checkpoint_20.pth'
 
   equip_audio_branch: False
 

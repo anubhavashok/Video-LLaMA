@@ -1,6 +1,6 @@
 model:
   arch: video_llama
-  model_type: pretrain_vicuna
+  model_type: mistral #pretrain_vicuna
   freeze_vit: True
   freeze_qformer: True
   max_txt_len: 512
@@ -14,7 +14,8 @@ model:
   # some ckpts could be download from our provided huggingface repo
   # i.e.  https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Finetuned
   #llama_model: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1" #ckpt/vicuna-7b" #"ckpt/vicuna-13b/" or "ckpt/vicuna-7b/" or "ckpt/llama-2-7b-chat-hf"  or "ckpt/llama-2-13b-chat-hf"
-  llama_model: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1" #ckpt/vicuna-7b" #"ckpt/vicuna-13b/" or "ckpt/vicuna-7b/" or "ckpt/llama-2-7b-chat-hf"  or "ckpt/llama-2-13b-chat-hf"
+  #llama_model: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1" #ckpt/vicuna-7b" #"ckpt/vicuna-13b/" or "ckpt/vicuna-7b/" or "ckpt/llama-2-7b-chat-hf"  or "ckpt/llama-2-13b-chat-hf"
+  llama_model: "/mnt/g/llms/oogabooga_model/mistralai_Mistral-7B-Instruct-v0.1"
   #ckpt: "video_llama/output/videollama_stage2_finetune/20231018185/checkpoint_2.pth"
   #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231024133/checkpoint_2.pth"
   #ckpt: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231026204/checkpoint_2.pth"
@@ -46,7 +47,7 @@ model:
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231214234/checkpoint_2.pth'
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231213021/checkpoint_8.pth'
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231213021/checkpoint_9.pth'
-  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231214234/checkpoint_9.pth'
+  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231217021/checkpoint_3.pth'
 
   equip_audio_branch: False
 

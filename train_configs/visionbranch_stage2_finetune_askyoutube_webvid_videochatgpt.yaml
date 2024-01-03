@@ -20,7 +20,10 @@ model:
   # The ckpt of vision branch after stage1 pretrained, 
   #ckpt: "/mnt/g/videollama/Video-LLaMA-Series/finetune-vicuna7b-v2.pth"   # you can use our pretrained ckpt from https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Pretrained/
   #ckpt: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231204113/checkpoint_9.pth"
-  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231204162/checkpoint_9.pth'
+  #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231204162/checkpoint_9.pth'
+  #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231209233/checkpoint_44.pth'
+  #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231214234/checkpoint_9.pth'
+  #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231226170/checkpoint_29.pth'
 
 
   # only train vision branch
@@ -45,6 +48,9 @@ model:
   end_sym: "###"
   prompt_path: "prompts/alignment_image.txt"
   prompt_template: '###Human: {} ###Assistant: '
+
+  use_clip_loss: True #False
+  clip_dim_size: 1024
   
 
 datasets:    
@@ -56,7 +62,7 @@ datasets:
     vis_processor:
       train:
         name: "alpro_video_train"
-        n_frms: 4
+        n_frms: 6
         image_size: 224
     text_processor:
       train:
@@ -72,7 +78,7 @@ datasets:
     vis_processor:
       train:
         name: "alpro_video_train"
-        n_frms: 4
+        n_frms: 6
         image_size: 224
     text_processor:
       train:
@@ -88,7 +94,7 @@ datasets:
     vis_processor:
       train:
         name: "alpro_video_train"
-        n_frms: 4
+        n_frms: 6
         image_size: 224
     text_processor:
       train:
@@ -97,7 +103,6 @@ datasets:
     tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
     model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
 
-    use_clip_loss: False
  
     
 run:
@@ -109,7 +114,7 @@ run:
   warmup_lr: 1e-6
 
   weight_decay: 0.05
-  max_epoch: 10
+  max_epoch: 30
   iters_per_epoch: 1000
   batch_size_train: 1
   batch_size_eval: 1
@@ -125,6 +130,10 @@ run:
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231023163/checkpoint_1.pth" #null
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231030154/checkpoint_2.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231031015/checkpoint_7.pth"
+  #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231222201/checkpoint_24.pth'
+  #'/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231222005/checkpoint_11.pth'
+  #/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231218133/checkpoint_9.pth'
+  resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231228014/checkpoint_5.pth'
 
   evaluate: False 
   train_splits: ["train"]

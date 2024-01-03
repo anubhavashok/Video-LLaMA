@@ -6,6 +6,8 @@ from video_llama.common.registry import registry
 from video_llama.datasets.builders.base_dataset_builder import BaseDatasetBuilder
 from video_llama.datasets.datasets.webvid_datasets import WebvidDataset
 from video_llama.datasets.datasets.askyoutube_datasets import AskYoutubeDataset
+from video_llama.datasets.datasets.kinetics_datasets import KineticsDataset
+from video_llama.datasets.datasets.msrvtt_datasets import MSRVTTDataset
 
 @registry.register_builder("webvid")
 class WebvidBuilder(BaseDatasetBuilder):
@@ -61,3 +63,59 @@ class AskYoutubeBuilder(BaseDatasetBuilder):
         )
 
         return datasets
+
+@registry.register_builder("kinetics")
+class KineticsBuilder(BaseDatasetBuilder):
+    train_dataset_cls = KineticsDataset
+    DATASET_CONFIG_DICT = {"default": "configs/datasets/kinetics/defaults.yaml"}
+    
+    def _download_ann(self):
+        pass
+
+    def _download_vis(self):
+        pass
+
+    def build(self):
+        self.build_processors()
+        datasets = dict()
+        split = "train"
+
+        build_info = self.config.build_info
+        dataset_cls = self.train_dataset_cls
+        datasets[split] = dataset_cls(
+            vis_processor=self.vis_processors[split],
+            text_processor=self.text_processors[split],
+            vis_root=build_info.videos_dir,
+            ann_root=build_info.anno_dir
+        )
+
+        return datasets
+
+@registry.register_builder("msrvtt")
+class MSRVTTBuilder(BaseDatasetBuilder):
+    train_dataset_cls = MSRVTTDataset
+    DATASET_CONFIG_DICT = {"default": "configs/datasets/msrvtt/defaults.yaml"}
+    
+    def _download_ann(self):
+        pass
+
+    def _download_vis(self):
+        pass
+
+    def build(self):
+        self.build_processors()
+        datasets = dict()
+        split = "train"
+
+        build_info = self.config.build_info
+        dataset_cls = self.train_dataset_cls
+        datasets[split] = dataset_cls(
+            vis_processor=self.vis_processors[split],
+            text_processor=self.text_processors[split],
+            vis_root=build_info.videos_dir,
+            ann_root=build_info.anno_dir
+        )
+
+        return datasets
+
+

@@ -21,7 +21,7 @@ model:
   #ckpt: "/mnt/g/videollama/Video-LLaMA-Series/finetune-vicuna7b-v2.pth"   # you can use our pretrained ckpt from https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Pretrained/
   #ckpt: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231203003/checkpoint_9.pth"
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207011/checkpoint_9.pth'
-  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231208202/checkpoint_9.pth'
+  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231231031/checkpoint_99.pth'
 
 
   # only train vision branch
@@ -67,7 +67,7 @@ datasets:
       train:
         name: "blip_caption"
     num_video_query_token: 32
-    sample_ratio: 50
+    sample_ratio: 33
     tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
     model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
   webvid:
@@ -84,9 +84,44 @@ datasets:
       train:
         name: "blip_caption"
     num_video_query_token: 32
-    sample_ratio: 50
+    sample_ratio: 33
     tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
     model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+  kinetics:
+    data_type: video
+    build_info:
+      anno_dir: /mnt/g/kinetics/k400/annotations/train.csv
+      videos_dir: /mnt/g/kinetics/k400/train
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 33
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+  msrvtt:
+    data_type: video
+    build_info:
+      anno_dir: /mnt/g/msrvtt/MSRVTT/MSRVTT/annotation/MSR_VTT.json
+      videos_dir: /mnt/g/msrvtt/MSRVTT/MSRVTT/videos/all
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 33
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+ 
  
 run:
   task: video_text_pretrain
@@ -122,6 +157,7 @@ run:
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231203144/checkpoint_7.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231206211/checkpoint_1.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207145/checkpoint_0.pth"
+  resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20240102115/checkpoint_14.pth'
 
 
   evaluate: False 

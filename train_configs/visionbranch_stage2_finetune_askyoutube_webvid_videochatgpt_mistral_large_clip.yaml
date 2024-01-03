@@ -1,6 +1,6 @@
 model:
   arch: video_llama
-  model_type: pretrain_vicuna
+  model_type: mistral #pretrain_vicuna
   freeze_vit: True
   freeze_qformer: True
 
@@ -18,7 +18,10 @@ model:
   imagebind_ckpt_path: "/mnt/g/videollama/imagebind/imagebind_huge.pth"
 
   # The ckpt of vision branch after stage1 pretrained, 
-  ckpt: "/mnt/g/videollama/Video-LLaMA-Series/finetune-vicuna7b-v2.pth"   # you can use our pretrained ckpt from https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Pretrained/
+  #ckpt: "/mnt/g/videollama/Video-LLaMA-Series/finetune-vicuna7b-v2.pth"   # you can use our pretrained ckpt from https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Pretrained/
+  #ckpt: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231204113/checkpoint_9.pth"
+  #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207181/checkpoint_9.pth'
+  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231209233/checkpoint_44.pth'
 
 
   # only train vision branch
@@ -43,6 +46,8 @@ model:
   end_sym: "###"
   prompt_path: "prompts/alignment_image.txt"
   prompt_template: '###Human: {} ###Assistant: '
+  #use_clip_loss: True 
+  clip_dim_size: 1024
   
 
 datasets:    
@@ -54,14 +59,48 @@ datasets:
     vis_processor:
       train:
         name: "alpro_video_train"
-        n_frms: 4
+        n_frms: 6
         image_size: 224
     text_processor:
       train:
         name: "blip_caption"
-    num_video_query_token:  
-    tokenizer_name: "/mnt/g/llms/oogabooga_model/mistralai_Mistral-7B-Instruct-v0.1"
+    num_video_query_token: 32
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
     model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+  webvid_instruct:
+    data_type: video
+    build_info:
+      anno_dir: /mnt/g/videollama/datasets/videochat/videochat_instruct_11k.json
+      videos_dir: /mnt/f/videollama/datasets/webvid/data/videos
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 6
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+  videochatgpt_instruct:
+    data_type: video
+    build_info:
+      anno_dir: /mnt/g/videollama/datasets/videochatgpt/processed_instruct.json
+      videos_dir: /mnt/g/videollama/datasets/videochatgpt/videos
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 6
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+
+ 
     
 run:
   task: video_text_pretrain
@@ -74,20 +113,21 @@ run:
   weight_decay: 0.05
   max_epoch: 10
   iters_per_epoch: 1000
-  batch_size_train: 2
+  batch_size_train: 1
   batch_size_eval: 1
-  num_workers: 8
+  num_workers: 32
   warmup_steps: 1000
 
   seed: 42
-  output_dir: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune"
+  output_dir: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/"
 
   amp: True
-  #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231105114/checkpoint_3.pth"
+  #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231202232/checkpoint_2.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231027044/checkpoint_4.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231023163/checkpoint_1.pth" #null
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231030154/checkpoint_2.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231031015/checkpoint_7.pth"
+  #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231208160/checkpoint_0.pth'
 
   evaluate: False 
   train_splits: ["train"]

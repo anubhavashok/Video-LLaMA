@@ -310,7 +310,7 @@ class Chat:
             # image = self.vis_processor(image).unsqueeze(0).to(self.device)
             video, msg = load_video(
                 video_path=video_path,
-                n_frms=32,
+                n_frms=8,
                 height=224,
                 width=224,
                 sampling ="uniform", return_msg = True
@@ -366,6 +366,7 @@ class Chat:
         seg_embs = [self.model.llama_model.model.embed_tokens(seg_t) for seg_t in seg_tokens]
         mixed_embs = [emb for pair in zip(seg_embs[:-1], img_list) for emb in pair] + [seg_embs[-1]]
         mixed_embs = torch.cat(mixed_embs, dim=1)
+        mixed_embs = mixed_embs.to(torch.get_default_dtype())
         return mixed_embs
 
 if __name__ =='__main__':

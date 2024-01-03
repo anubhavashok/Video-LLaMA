@@ -2,11 +2,11 @@ model:
   arch: video_llama
   model_type: pretrain_vicuna
   freeze_vit: True
-  freeze_qformer: True
+  freeze_qformer: False #True
 
   low_resource: False
   #use_cache: True
-  use_grad_checkpoint: False # True
+  use_grad_checkpoint: False #True
 
   # Q-Former
   num_query_token: 32
@@ -21,7 +21,7 @@ model:
   #ckpt: "/mnt/g/videollama/Video-LLaMA-Series/finetune-vicuna7b-v2.pth"   # you can use our pretrained ckpt from https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Pretrained/
   #ckpt: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231203003/checkpoint_9.pth"
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207011/checkpoint_9.pth'
-  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231208202/checkpoint_9.pth'
+  ckpt: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207145/checkpoint_0.pth"
 
 
   # only train vision branch
@@ -50,7 +50,6 @@ model:
   # New
   use_clip_loss: True
   clip_dim_size: 1024
-  
 
 datasets:    
   askyoutube:
@@ -97,9 +96,9 @@ run:
   warmup_lr: 1e-6
 
   weight_decay: 0.05
-  max_epoch: 100
+  max_epoch: 10
   iters_per_epoch: 1000
-  batch_size_train: 16 #32
+  batch_size_train: 8 #32
   batch_size_eval: 1
   num_workers: 8
   warmup_steps: 50 #1000
@@ -121,8 +120,6 @@ run:
   #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231202003/checkpoint_8.pth'
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231203144/checkpoint_7.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231206211/checkpoint_1.pth"
-  #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207145/checkpoint_0.pth"
-
 
   evaluate: False 
   train_splits: ["train"]

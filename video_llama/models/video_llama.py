@@ -18,6 +18,8 @@ from video_llama.models.Qformer import BertConfig, BertLMHeadModel
 from video_llama.models.ImageBind.models.imagebind_model import ImageBindModel,ModalityType
 from video_llama.models.ImageBind.models import imagebind_model
 import numpy as np
+from transformers import MistralForCausalLM
+
 # from flamingo_pytorch import PerceiverResampler
 @registry.register_model("video_llama")
 class VideoLLAMA(Blip2Base):
@@ -28,6 +30,7 @@ class VideoLLAMA(Blip2Base):
     PRETRAINED_MODEL_CONFIG_DICT = {
         "pretrain_vicuna": "configs/models/video_llama.yaml",
         "pretrain_llama_v2": "configs/models/video_llama.yaml",
+        "mistral": "configs/models/video_llama.yaml",
     }
 
     @classmethod
@@ -79,6 +82,7 @@ class VideoLLAMA(Blip2Base):
         equip_audio_branch = True,
         use_clip_loss = True,
         clip_dim_size = 256,
+        model_type = None,
     ):
         super().__init__()
 
@@ -135,19 +139,37 @@ class VideoLLAMA(Blip2Base):
         self.AUDIO_PATCH_TOKEN_ID = self.llama_tokenizer.get_vocab()[DEFAULT_AUDIO_PATCH_TOKEN]
 
         logging.info('Loading LLAMA Model')
+        self.model_type = model_type
         if self.low_resource:
-            self.llama_model = LlamaForCausalLM.from_pretrained(
-                llama_model,
-                torch_dtype=torch.bfloat16,
-                load_in_8bit=True,
-                device_map={"":torch.cuda.current_device()}
-                #device_map='auto'#{'': device_8bit}
-            ).cuda()
+            if self.model_type == 'mistral':
+                self.llama_model = MistralForCausalLM.from_pretrained(
+                    llama_model,
+                    torch_dtype=torch.bfloat16,
+                    load_in_8bit=True,
+                    device_map={"":torch.cuda.current_device()}
+                    #device_map='auto'#{'': device_8bit}
+                )#.cuda()
+            else:
+                self.llama_model = LlamaForCausalLM.from_pretrained(
+                    llama_model,
+                    torch_dtype=torch.bfloat16,
+                    load_in_8bit=True,
+                    device_map={"":torch.cuda.current_device()}
+                    #device_map='auto'#{'': device_8bit}
+                )#.cuda()
         else:
-            self.llama_model = LlamaForCausalLM.from_pretrained(
-                llama_model,
-                torch_dtype=torch.bfloat16,
-            ).cuda()#cpu()#cuda()
+            if self.model_type == 'mistral':
+                self.llama_model = MistralForCausalLM.from_pretrained(
+                    llama_model,
+                    torch_dtype=torch.bfloat16,
+                    #attn_implementation="flash_attention_2",
+                ).cuda()
+            else:
+                self.llama_model = LlamaForCausalLM.from_pretrained(
+                    llama_model,
+                    #ignore_mismatched_sizes=True,
+                    torch_dtype=torch.bfloat16,
+                ).cuda()
 
         for name, param in self.llama_model.named_parameters():
             param.requires_grad = False
@@ -275,8 +297,8 @@ class VideoLLAMA(Blip2Base):
 
         self.use_clip_loss = use_clip_loss
         self.clip_dim_size = clip_dim_size
-        if use_clip_loss:
-            embed_dim = self.clip_dim_size #256
+        if True:#use_clip_loss:
+            embed_dim = 1024 #self.clip_dim_size #256
             init_logit_scale = 0.07#np.log(1 / 0.07)
             self.temperature_parameter = nn.Parameter(torch.ones([]) * init_logit_scale)
             self.vision_proj = nn.Linear(self.Qformer.config.hidden_size, embed_dim)
@@ -294,7 +316,7 @@ class VideoLLAMA(Blip2Base):
         self.visual_encoder.to("cpu")
         self.visual_encoder.float()
 
-    def encode_videoQformer_visual(self, image, instructions=None, output_video_embedding=False):
+    def encode_videoQformer_visual(self, image, instructions=None, output_video_embedding=False, output_post_vis_encoder=False):
         device = image.device
         
         # input shape b,c,t,h,w
@@ -303,6 +325,8 @@ class VideoLLAMA(Blip2Base):
         with self.maybe_autocast():
             # embed image features with blip2, out: (b t) q h
             image_embeds = self.ln_vision(self.visual_encoder(image)).to(device)
+            if output_post_vis_encoder:
+                return image_embeds
             image_atts = torch.ones(image_embeds.size()[:-1], dtype=torch.long).to(device)
 
             query_tokens = self.query_tokens.expand(image_embeds.shape[0], -1, -1)
@@ -557,7 +581,6 @@ class VideoLLAMA(Blip2Base):
             im_patch_token_id = self.IMAGE_PATCH_TOKEN_ID
             image = samples["images"]
             input_ids = samples['input_ids']
-            attention_mask = samples['attention_mask']
             texts = samples['texts']
             if len(image.size())==4:
                 time = 1
@@ -659,6 +682,7 @@ class VideoLLAMA(Blip2Base):
             inputs_embeds = torch.stack(new_input_embeds, dim=0)
             targets = samples['labels']
             #print('targets: ', targets)
+            attention_mask = samples['attention_mask']
             with self.maybe_autocast():
                 outputs = self.llama_model(
                     inputs_embeds=inputs_embeds,
@@ -757,7 +781,6 @@ class VideoLLAMA(Blip2Base):
                 return {'loss': clip_loss + caption_loss}
                 #return {'loss': caption_loss}
                 #return {'loss': clip_loss}
- 
 
             self.llama_tokenizer.padding_side = "right"
 
@@ -855,6 +878,8 @@ class VideoLLAMA(Blip2Base):
         use_clip_loss = cfg.get("use_clip_loss", False)
         clip_dim_size = cfg.get("clip_dim_size", 256)
 
+        model_type = cfg.get("model_type", None)
+
         model = cls(
             vit_model=vit_model,
             q_former_model=q_former_model,
@@ -885,6 +910,7 @@ class VideoLLAMA(Blip2Base):
             llama_proj_model = llama_proj_model,
             use_clip_loss = use_clip_loss,
             clip_dim_size = clip_dim_size,
+            model_type = model_type
         )
 
         ckpt_path = cfg.get("ckpt", "")  # load weights of MiniGPT-4
