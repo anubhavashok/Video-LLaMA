@@ -22,9 +22,21 @@ import random as rnd
 MAX_INT = registry.get("MAX_INT")
 decord.bridge.set_bridge("torch")
 
-def load_video(video_path, n_frms=MAX_INT, height=-1, width=-1, sampling="uniform", return_msg = False):
+def load_video(video_path, n_frms=MAX_INT, height=-1, width=-1, shortest_side=None, sampling="uniform", return_msg = False):
     decord.bridge.set_bridge("torch")
-    vr = VideoReader(uri=video_path, height=height, width=width)
+    if shortest_side is not None:
+        vr = VideoReader(uri=video_path, width=shortest_side)
+        #height, width = vr.height, vr.width
+        #print(height, width)
+        #if height < width:
+        #    height = shortest_side
+        #    width = width * (shortest_side / height)
+        #else:
+        #    width = shortest_side
+        #height = height * (shortest_side / width)
+        #vr = VideoReader(uri=video_path, height=height, width=width)
+    else:
+        vr = VideoReader(uri=video_path, height=height, width=width)
 
     vlen = len(vr)
     start, end = 0, vlen
@@ -262,3 +274,67 @@ class AlproVideoEvalProcessor(AlproVideoBaseProcessor):
         n_frms = cfg.get("n_frms", MAX_INT)
 
         return cls(image_size=image_size, mean=mean, std=std, n_frms=n_frms)
+
+
+@registry.register_processor("resize_centercrop_video_train")
+class ResizeCenterCropVideoTrainProcessor(AlproVideoBaseProcessor):
+    def __init__(
+        self,
+        image_size=384,
+        mean=None,
+        std=None,
+        n_frms=MAX_INT,
+    ):
+        super().__init__(mean=mean, std=std, n_frms=n_frms)
+
+        self.image_size = image_size
+
+        self.transform = transforms.Compose(
+            [
+                # Video size is (C, T, H, W)
+                transforms_video.ResizedCenterCropVideo(
+                    (image_size, image_size)
+                ),
+                ToTHWC(),  # C, T, H, W -> T, H, W, C
+                ToUint8(),
+                transforms_video.ToTensorVideo(),  # T, H, W, C -> C, T, H, W
+                self.normalize,
+            ]
+        )
+
+    def __call__(self, vpath):
+        """
+        Args:
+            clip (torch.tensor): Video clip to be cropped. Size is (C, T, H, W)
+        Returns:
+            torch.tensor: video clip after transforms. Size is (C, T, size, size).
+        """
+        clip = load_video(
+            video_path=vpath,
+            n_frms=self.n_frms,
+            shortest_side=self.image_size,
+            #sampling="headtail",
+        )
+
+        return self.transform(clip)
+
+    @classmethod
+    def from_config(cls, cfg=None):
+        if cfg is None:
+            cfg = OmegaConf.create()
+
+        image_size = cfg.get("image_size", 256)
+
+        mean = cfg.get("mean", None)
+        std = cfg.get("std", None)
+
+        n_frms = cfg.get("n_frms", MAX_INT)
+
+        return cls(
+            image_size=image_size,
+            mean=mean,
+            std=std,
+            n_frms=n_frms,
+        )
+
+

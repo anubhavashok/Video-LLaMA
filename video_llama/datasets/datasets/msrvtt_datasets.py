@@ -46,7 +46,13 @@ class MSRVTTDataset(BaseDataset):
         return dict([(os.path.splitext(os.path.basename(path))[0], path) for path in glob.glob(os.path.join(vis_root, '*.mp4'))])
 
     def _load_annotations(self, ann_root):
-        return json.load(open(ann_root))['annotations']
+        data = json.load(open(ann_root))['annotations']
+        test_videos = open('/mnt/g/msrvtt/MSRVTT/MSRVTT/high-quality/structured-symlinks/test_list_full.txt').read().split('\n')
+        filtered_data = []
+        for d in data:
+            if d['image_id'] not in test_videos:
+                filtered_data.append(d)
+        return filtered_data
 
     def _check_video_chunk_exists(self, video_id, i):
         video_path = os.path.join(self.video_paths[video_id])
@@ -56,8 +62,9 @@ class MSRVTTDataset(BaseDataset):
         #index = index % 2
         num_retries = 10  # skip error videos
         for _ in range(num_retries):
-            sample = self.annotation.iloc[index]
-            sample_dict = sample.to_dict()
+            #sample = self.annotation.iloc[index]
+            sample = self.annotation[index]
+            sample_dict = sample#.to_dict()
 
             video_id = sample_dict['image_id']
             text = sample_dict['caption']

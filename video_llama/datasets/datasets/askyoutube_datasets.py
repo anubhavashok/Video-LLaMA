@@ -46,7 +46,8 @@ class AskYoutubeDataset(BaseDataset):
         return dict([(path.split('/')[-1], path) for path in glob.glob(os.path.join(vis_root, '*'))])
 
     def _load_annotations(self, ann_root):
-        captions_files = glob.glob(os.path.join(ann_root, '*', 'chunked_captions_30s.json'))
+        #captions_files = glob.glob(os.path.join(ann_root, '*', 'chunked_captions_30s.json'))
+        captions_files = glob.glob(os.path.join(ann_root, '*', 'chunked_captions_30s_clean.json'))
         all_captions = []
         for captions_file in captions_files:
             video_id = os.path.dirname(captions_file).split('/')[-1]
@@ -56,6 +57,14 @@ class AskYoutubeDataset(BaseDataset):
                 captions = json.load(f)
             # combine captions.
             for i, chunk in enumerate(captions):
+                if 'transcript' in chunk:
+                    if 'bad' in chunk and chunk['bad'] or len(chunk['transcript']) == 0:
+                        continue
+                    if not self._check_video_chunk_exists(video_id, i):
+                        continue
+                    all_captions.append({'video_id': video_id, 'seq_num': chunk['chunk_idx'], 'caption': chunk['transcript']})
+                else:
+                    continue
                 #cap = '\n'.join(['\n'.join([s['utf8'] for s in seg['segs']]) for seg in chunk])
                 cap = ''
                 for seg in chunk:
@@ -97,7 +106,8 @@ class AskYoutubeDataset(BaseDataset):
             try:
                 video = self.vis_processor(video_path)
                 #print('video: ', video)
-            except:
+            except Exception as e:
+                print(e)
                 print(f"Failed to load examples with video: {video_path}. "
                             f"Will randomly sample an example as a replacement.")
                 index = random.randint(0, len(self) - 1)

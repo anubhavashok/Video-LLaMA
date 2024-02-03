@@ -18,6 +18,7 @@ from video_llama.models.Qformer import BertConfig, BertLMHeadModel
 from video_llama.models.ImageBind.models.imagebind_model import ImageBindModel,ModalityType
 from video_llama.models.ImageBind.models import imagebind_model
 import numpy as np
+import copy
 from transformers import MistralForCausalLM
 
 # from flamingo_pytorch import PerceiverResampler
@@ -35,6 +36,7 @@ class VideoLLAMA(Blip2Base):
 
     @classmethod
     def init_video_Qformer(cls, num_query_token, vision_width,num_hidden_layers =2):
+        num_hidden_layers = 4
         encoder_config = BertConfig.from_pretrained("bert-base-uncased")
         encoder_config.num_hidden_layers = num_hidden_layers
         encoder_config.encoder_width = vision_width
@@ -348,6 +350,11 @@ class VideoLLAMA(Blip2Base):
             frame_hidden_state = frame_position_embeddings + frame_hidden_state
 
             # frame attention
+
+            ## TODO: Experiment
+            #frame_hidden_state = frame_hidden_state.mean(2, keepdim=True)
+            ## End
+
             frame_hidden_state =  einops.rearrange(frame_hidden_state, 'b t q h -> b (t q) h',b=batch_size,t=time_length)
             frame_atts = torch.ones(frame_hidden_state.size()[:-1], dtype=torch.long).to(device)
             video_query_tokens = self.video_query_tokens.expand(frame_hidden_state.shape[0], -1, -1)
@@ -375,6 +382,7 @@ class VideoLLAMA(Blip2Base):
                     use_cache=True,
                     return_dict=True,
                     )
+            #video_query_output = copy.deepcopy(video_query_output)
             past_key_values = video_query_output.past_key_values
             video_hidden = video_query_output.last_hidden_state
             #print('video_hidden.size() ', video_hidden.size())
@@ -550,12 +558,12 @@ class VideoLLAMA(Blip2Base):
     def compute_clip_loss(self, video_embeds, text_embeds):
         # Compute weighted img_embeds?
         #video_embeds = img_embeds.mean(axis=2)
-        print(video_embeds.size(), text_embeds.size())
+        #print(video_embeds.size(), text_embeds.size())
         normalized_video_embeds = video_embeds.norm(dim=1, p=2)
         normalized_text_embeds = text_embeds.norm(dim=1, p=2)
 
         logits = torch.matmul(video_embeds.float(), text_embeds.float().transpose(1, 0)) * torch.exp(self.temperature_parameter)
-        print(logits.size())
+        #print(logits.size())
         batch_size = text_embeds.size(0)
         labels = torch.arange(batch_size).to(video_embeds.device)
         
