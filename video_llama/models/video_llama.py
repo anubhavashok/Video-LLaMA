@@ -19,7 +19,7 @@ from video_llama.models.ImageBind.models.imagebind_model import ImageBindModel,M
 from video_llama.models.ImageBind.models import imagebind_model
 import numpy as np
 import copy
-from transformers import MistralForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer, MistralForCausalLM
 
 # from flamingo_pytorch import PerceiverResampler
 @registry.register_model("video_llama")
@@ -32,11 +32,13 @@ class VideoLLAMA(Blip2Base):
         "pretrain_vicuna": "configs/models/video_llama.yaml",
         "pretrain_llama_v2": "configs/models/video_llama.yaml",
         "mistral": "configs/models/video_llama.yaml",
+        "phi-2": "configs/models/video_llama.yaml",
+        "phi-3": "configs/models/video_llama.yaml",
     }
 
     @classmethod
     def init_video_Qformer(cls, num_query_token, vision_width,num_hidden_layers =2):
-        num_hidden_layers = 4
+        #num_hidden_layers = 4
         encoder_config = BertConfig.from_pretrained("bert-base-uncased")
         encoder_config.num_hidden_layers = num_hidden_layers
         encoder_config.encoder_width = vision_width
@@ -83,11 +85,15 @@ class VideoLLAMA(Blip2Base):
         imagebind_ckpt_path = '/mnt/workspace/ckpt',
         equip_audio_branch = True,
         use_clip_loss = True,
+        use_generation_loss = True,
+        use_itm_loss = True,
         clip_dim_size = 256,
+        num_videoq_hidden_layers = 4,
         model_type = None,
     ):
         super().__init__()
 
+        self.model_type = model_type
         self.tokenizer = self.init_tokenizer()
         self.low_resource = low_resource
 
@@ -117,7 +123,8 @@ class VideoLLAMA(Blip2Base):
         for layer in self.Qformer.bert.encoder.layer:
             layer.output = None
             layer.intermediate = None
-        self.load_from_pretrained(url_or_filename=q_former_model)
+        if vit_model != 'clip_vit_L':
+            self.load_from_pretrained(url_or_filename=q_former_model)
 
         if freeze_qformer:
             for name, param in self.Qformer.named_parameters():
@@ -129,7 +136,16 @@ class VideoLLAMA(Blip2Base):
         logging.info('Loading Q-Former Done')
 
         logging.info('Loading LLAMA Tokenizer')
-        self.llama_tokenizer = LlamaTokenizer.from_pretrained(llama_model, use_fast=False)
+
+        if self.model_type == 'phi-2' or self.model_type == 'phi-3':
+            print(llama_model)
+            self.llama_tokenizer = AutoTokenizer.from_pretrained(
+                    llama_model, use_fast=True)
+        elif self.model_type == 'mistral':
+            self.llama_tokenizer = AutoTokenizer.from_pretrained(
+                    llama_model, use_fast=False)
+        else:
+            self.llama_tokenizer = LlamaTokenizer.from_pretrained(llama_model, use_fast=False)
         if self.llama_tokenizer.pad_token is None:
             self.llama_tokenizer.pad_token = self.llama_tokenizer.unk_token 
         DEFAULT_IMAGE_PATCH_TOKEN = '<ImageHere>'
@@ -151,6 +167,14 @@ class VideoLLAMA(Blip2Base):
                     device_map={"":torch.cuda.current_device()}
                     #device_map='auto'#{'': device_8bit}
                 )#.cuda()
+            elif self.model_type == 'phi-2' or self.model_type == 'phi-3':
+                self.llama_model = AutoModelForCausalLM.from_pretrained(
+                        llama_model,
+                        torch_dtype=torch.bfloat16,
+                        load_in_8bit=True,
+                        device_map={"":torch.cuda.current_device()},
+                        trust_remote_code=True
+                        )
             else:
                 self.llama_model = LlamaForCausalLM.from_pretrained(
                     llama_model,
@@ -166,6 +190,13 @@ class VideoLLAMA(Blip2Base):
                     torch_dtype=torch.bfloat16,
                     #attn_implementation="flash_attention_2",
                 ).cuda()
+            elif self.model_type == 'phi-2' or self.model_type == 'phi-3':
+                self.llama_model = AutoModelForCausalLM.from_pretrained(
+                        llama_model,
+                        torch_dtype=torch.bfloat16,
+                        trust_remote_code=True
+                ).cuda()
+                print(self.llama_model)
             else:
                 self.llama_model = LlamaForCausalLM.from_pretrained(
                     llama_model,
@@ -216,8 +247,9 @@ class VideoLLAMA(Blip2Base):
 
         self.num_video_query_token = num_video_query_token
         self.video_Qformer,self.video_query_tokens = self.init_video_Qformer(num_query_token = num_video_query_token,\
-            vision_width=self.Qformer.config.hidden_size, num_hidden_layers =2)
-
+            vision_width=self.Qformer.config.hidden_size, num_hidden_layers=num_videoq_hidden_layers)
+        
+        #self.video_query_token_linear = nn.Linear(num_query_token * self.Qformer.config.hidden_size, self.Qformer.config.hidden_size)
         #self.video_Qformer.cls = None
         #self.video_Qformer.bert.embeddings.word_embeddings = None
         #self.video_Qformer.bert.embeddings.position_embeddings = None
@@ -298,9 +330,13 @@ class VideoLLAMA(Blip2Base):
                 logging.info('audio_Qformer is not frozen')
 
         self.use_clip_loss = use_clip_loss
+        self.use_generation_loss = use_generation_loss
+        self.use_itm_loss = use_itm_loss
         self.clip_dim_size = clip_dim_size
-        if True:#use_clip_loss:
-            embed_dim = 1024 #self.clip_dim_size #256
+        #if True:#use_clip_loss:
+        if use_clip_loss:
+            #embed_dim = 1024 #self.clip_dim_size #256
+            embed_dim = self.clip_dim_size
             init_logit_scale = 0.07#np.log(1 / 0.07)
             self.temperature_parameter = nn.Parameter(torch.ones([]) * init_logit_scale)
             self.vision_proj = nn.Linear(self.Qformer.config.hidden_size, embed_dim)
@@ -310,6 +346,11 @@ class VideoLLAMA(Blip2Base):
             for name, param in self.vision_proj.named_parameters():
                 param.requires_grad = True
             self.temperature_parameter.requires_grad = True
+            del self.llama_model
+            del self.llama_proj
+            self.llama_proj = None
+            self.llama_model = None
+            self.itm_head = nn.Linear(self.Qformer.config.hidden_size, 2)
 
         #  self.audio_hidden_size
     def vit_to_cpu(self):
@@ -352,6 +393,8 @@ class VideoLLAMA(Blip2Base):
             # frame attention
 
             ## TODO: Experiment
+            # TODO: Create video query tokens and add frame position embeddings.
+            #video_query_tokens = self.video_query_token_linear(einops.rearrange(frame_hidden_state, 'b t q h -> b t (q h)'))
             #frame_hidden_state = frame_hidden_state.mean(2, keepdim=True)
             ## End
 
@@ -386,11 +429,15 @@ class VideoLLAMA(Blip2Base):
             past_key_values = video_query_output.past_key_values
             video_hidden = video_query_output.last_hidden_state
             #print('video_hidden.size() ', video_hidden.size())
-            inputs_llama = self.llama_proj(video_hidden)
-            atts_llama = torch.ones(inputs_llama.size()[:-1], dtype=torch.long).to(image_embeds.device)
+            if self.llama_proj is not None:
+                inputs_llama = self.llama_proj(video_hidden)
+                atts_llama = torch.ones(inputs_llama.size()[:-1], dtype=torch.long).to(image_embeds.device)
+            else:
+                inputs_llama = None
+                atts_llama = None
             video_query_output.past_key_values = past_key_values
             if output_video_embedding:
-                return inputs_llama, atts_llama, video_query_tokens, video_query_output
+                return inputs_llama, atts_llama, video_query_tokens, video_query_output, frame_hidden_state, frame_atts
         return inputs_llama, atts_llama
     
     def encode_videoQformer_visual_image(self, image, output_video_embedding=False):
@@ -540,6 +587,7 @@ class VideoLLAMA(Blip2Base):
 
         batch_size = image_feats_all.size(0)
         targets = torch.arange(batch_size).to(image_feats_all.device)
+        #siglip
         #targets = F.one_hot(targets, num_classes=int(batch_size)).float()
         #loss_i2t = F.binary_cross_entropy_with_logits(sim_i2t, targets)
         #loss_t2i = F.binary_cross_entropy_with_logits(sim_t2i, targets)
@@ -552,7 +600,7 @@ class VideoLLAMA(Blip2Base):
                 #+ F.cross_entropy(sim_t2i, targets)
                 loss_i2t + loss_t2i
             ) / 2
-        return loss
+        return loss, sim_i2t, sim_t2i
 
 
     def compute_clip_loss(self, video_embeds, text_embeds):
@@ -597,7 +645,7 @@ class VideoLLAMA(Blip2Base):
             if self.train_flag == 0:
                 num_patch_tokens = self.num_video_query_token
                 #img_embeds, atts_img = self.encode_videoQformer_visual(image)
-                img_embeds, atts_img, video_query_tokens, video_query_output = self.encode_videoQformer_visual(image, output_video_embedding=True)
+                img_embeds, atts_img, video_query_tokens, video_query_output, frame_hidden_state, frame_atts = self.encode_videoQformer_visual(image, output_video_embedding=True)
                 video_embedding = video_query_output.last_hidden_state
             elif self.train_flag == 1:
                 num_patch_tokens = self.num_audio_query_token
@@ -640,8 +688,82 @@ class VideoLLAMA(Blip2Base):
                 clip_text_feature = F.normalize(self.text_proj(clip_text_feature), dim=-1)
                 clip_image_feature = F.normalize(self.vision_proj(video_embedding), dim=-1)
                 #clip_image_feature = self.image_global_pool(img_embeds)
-                clip_loss = self.compute_clip_loss_blip(clip_image_feature, clip_text_feature)
+                clip_loss, sim_i2t, sim_t2i = self.compute_clip_loss_blip(clip_image_feature, clip_text_feature)
+            if self.use_itm_loss:
+                # TODO: Check that sim_i2t and sim_t2i exist.
+                # TODO: Check that blip_text_tokens exists.
+                decoder_input_ids = blip_text_tokens.input_ids.clone()
+                query_atts = torch.ones(video_query_tokens.size()[:-1], dtype=torch.long).to(
+                    image.device
+                )
+                # TODO: Get labels for pairs.
+                bs = image.size(0)
+                # Sample according to predicted similarity score.
+                sim_t2i[:, :].fill_diagonal_(-10000)
+                sim_i2t[:, :].fill_diagonal_(-10000)
+                weights_t2i = F.softmax(sim_t2i, dim=1)
+                weights_i2t = F.softmax(sim_i2t, dim=1)
 
+                # select a negative video for each text
+                video_embeds_neg = []
+                for b in range(bs):
+                    neg_idx = torch.multinomial(weights_t2i[b], 1).item()
+                    # Note: here image_embs is actually the frame_hidden_state
+                    # This is what goes into the Video QFormer as encoder hidden states
+                    video_embeds_neg.append(frame_hidden_state[neg_idx])
+                video_embeds_neg = torch.stack(video_embeds_neg, dim=0)
+
+                # select a negative text for each video
+                text_ids_neg = []
+                text_atts_neg = []
+                for b in range(bs):
+                    neg_idx = torch.multinomial(weights_i2t[b], 1).item()
+                    text_ids_neg.append(decoder_input_ids[neg_idx])
+                    text_atts_neg.append(blip_text_tokens.attention_mask[neg_idx])
+
+                # Assemble texts for ITM.
+                text_ids_neg = torch.stack(text_ids_neg, dim=0)
+                text_atts_neg = torch.stack(text_atts_neg, dim=0)
+                text_ids_all = torch.cat(
+                    [blip_text_tokens.input_ids, blip_text_tokens.input_ids, text_ids_neg], dim=0
+                )  # pos, pos, neg
+                text_atts_all = torch.cat(
+                    [blip_text_tokens.attention_mask, blip_text_tokens.attention_mask, text_atts_neg],
+                    dim=0,
+                )
+
+                # Assemble videos for ITM.
+                video_query_tokens_itm = self.video_query_tokens.expand(text_atts_all.shape[0], -1, -1)
+                query_atts_itm = torch.ones(video_query_tokens_itm.size()[:-1], dtype=torch.long).to(
+                    image.device
+                )
+                attention_mask_all = torch.cat([query_atts_itm, text_atts_all], dim=1)
+
+                video_embeds_all = torch.cat(
+                    [frame_hidden_state, video_embeds_neg, frame_hidden_state], dim=0
+                )  # pos, neg, pos
+                video_atts_all = torch.ones(video_embeds_all.size()[:-1], dtype=torch.long).to(
+                    image.device
+                )
+
+                output_itm = self.video_Qformer.bert(
+                    text_ids_all,
+                    query_embeds=video_query_tokens_itm,
+                    attention_mask=attention_mask_all,
+                    encoder_hidden_states=video_atts_all,
+                    encoder_attention_mask=video_atts_all,
+                    return_dict=True)
+
+                itm_embeddings = output_itm.last_hidden_state[:, : video_query_tokens_itm.size(1), :]
+
+                itm_logit = self.itm_head(itm_embeddings)
+                itm_logit = itm_logit.mean(dim=1)
+                itm_labels = torch.cat(
+                    [torch.ones(bs, dtype=torch.long), torch.zeros(2 * bs, dtype=torch.long)],
+                    dim=0,
+                ).to(image.device)
+                itm_loss = F.cross_entropy(itm_logit, itm_labels)
+            if self.use_generation_loss:
                 # Image captioning.
                 decoder_input_ids = blip_text_tokens.input_ids.clone()
                 #decoder_input_ids[:, 0] = self.tokenizer.bos_token_id
@@ -668,7 +790,15 @@ class VideoLLAMA(Blip2Base):
                 #print('clip_loss: ', clip_loss)
                 #print('caption_loss: ', clip_loss)
 
-                return {'loss': clip_loss + caption_loss}
+            losses = None
+            if self.use_clip_loss:
+                losses = clip_loss
+                if self.use_itm_loss:
+                    losses += itm_loss
+                if self.use_generation_loss:
+                    losses += caption_loss
+                return {'loss': losses}
+            
             #exit()
 
             new_input_embeds=[]
@@ -716,13 +846,10 @@ class VideoLLAMA(Blip2Base):
                 img_embeds, atts_img = self.encode_audioQformer(image, modality_type=ModalityType.VISION)
             else:
                 #img_embeds, atts_img = self.encode_videoQformer_visual(image)
-                img_embeds, atts_img, video_query_tokens, video_query_output = self.encode_videoQformer_visual(image, output_video_embedding=True)
+                img_embeds, atts_img, video_query_tokens, video_query_output, frame_hidden_state, frame_atts = self.encode_videoQformer_visual(image, output_video_embedding=True)
                 video_embedding = video_query_output.last_hidden_state
 
-            if self.prompt_list:
-                prompt = random.choice(self.prompt_list)
-                img_embeds, atts_img = self.prompt_wrap(img_embeds, atts_img, prompt)
-                
+               
             if self.use_clip_loss:
                 #with self.maybe_autocast():
                 #    text_only_outputs = self.llama_model(
@@ -753,7 +880,83 @@ class VideoLLAMA(Blip2Base):
                 clip_text_feature = F.normalize(self.text_proj(clip_text_feature), dim=-1)
                 clip_image_feature = F.normalize(self.vision_proj(video_embedding), dim=-1)
                 #clip_image_feature = self.image_global_pool(img_embeds)
-                clip_loss = self.compute_clip_loss_blip(clip_image_feature, clip_text_feature)
+                clip_loss, sim_i2t, sim_t2i = self.compute_clip_loss_blip(clip_image_feature, clip_text_feature)
+            if self.use_itm_loss:
+                # TODO: Check that sim_i2t and sim_t2i exist.
+                # TODO: Check that blip_text_tokens exists.
+                decoder_input_ids = blip_text_tokens.input_ids.clone()
+                query_atts = torch.ones(video_query_tokens.size()[:-1], dtype=torch.long).to(
+                    image.device
+                )
+                # TODO: Get labels for pairs.
+                bs = image.size(0)
+                # Sample according to predicted similarity score.
+                sim_t2i[:, :].fill_diagonal_(-10000)
+                sim_i2t[:, :].fill_diagonal_(-10000)
+                weights_t2i = F.softmax(sim_t2i, dim=1).detach()
+                weights_i2t = F.softmax(sim_i2t, dim=1).detach()
+
+                # select a negative video for each text
+                video_embeds_neg = []
+                for b in range(bs):
+                    neg_idx = torch.multinomial(weights_t2i[b], 1).item()
+                    # Note: here image_embs is actually the frame_hidden_state
+                    # This is what goes into the Video QFormer as encoder hidden states
+                    video_embeds_neg.append(frame_hidden_state[neg_idx])
+                video_embeds_neg = torch.stack(video_embeds_neg, dim=0)
+
+                # select a negative text for each video
+                text_ids_neg = []
+                text_atts_neg = []
+                for b in range(bs):
+                    neg_idx = torch.multinomial(weights_i2t[b], 1).item()
+                    text_ids_neg.append(decoder_input_ids[neg_idx])
+                    text_atts_neg.append(blip_text_tokens.attention_mask[neg_idx])
+
+                # Assemble texts for ITM.
+                text_ids_neg = torch.stack(text_ids_neg, dim=0)
+                text_atts_neg = torch.stack(text_atts_neg, dim=0)
+
+                text_ids_all = torch.cat(
+                    [blip_text_tokens.input_ids, blip_text_tokens.input_ids, text_ids_neg], dim=0
+                )  # pos, pos, neg
+                text_atts_all = torch.cat(
+                    [blip_text_tokens.attention_mask, blip_text_tokens.attention_mask, text_atts_neg],
+                    dim=0,
+                )
+
+                # Assemble videos for ITM.
+                video_query_tokens_itm = self.video_query_tokens.expand(text_atts_all.shape[0], -1, -1)
+                query_atts_itm = torch.ones(video_query_tokens_itm.size()[:-1], dtype=torch.long).to(
+                    image.device
+                )
+                attention_mask_all = torch.cat([query_atts_itm, text_atts_all], dim=1)
+
+                video_embeds_all = torch.cat(
+                    [frame_hidden_state, video_embeds_neg, frame_hidden_state], dim=0
+                )  # pos, neg, pos
+                video_atts_all = torch.ones(video_embeds_all.size()[:-1], dtype=torch.long).to(
+                    image.device
+                )
+
+                output_itm = self.video_Qformer.bert(
+                    text_ids_all,
+                    query_embeds=video_query_tokens_itm,
+                    attention_mask=attention_mask_all,
+                    encoder_hidden_states=video_embeds_all,
+                    encoder_attention_mask=video_atts_all,
+                    return_dict=True)
+
+                itm_embeddings = output_itm.last_hidden_state[:, : video_query_tokens_itm.size(1), :]
+
+                itm_logit = self.itm_head(itm_embeddings)
+                itm_logit = itm_logit.mean(dim=1)
+                itm_labels = torch.cat(
+                    [torch.ones(bs, dtype=torch.long), torch.zeros(2 * bs, dtype=torch.long)],
+                    dim=0,
+                ).to(image.device)
+                itm_loss = F.cross_entropy(itm_logit, itm_labels)
+            if self.use_generation_loss:
                 # Image captioning.
                 decoder_input_ids = blip_text_tokens.input_ids.clone()
                 #print('BOS token id: ', self.tokenizer.bos_token_id)
@@ -786,10 +989,19 @@ class VideoLLAMA(Blip2Base):
                 #print('clip_loss: ', clip_loss)
                 #print('caption_loss: ', caption_loss)
 
-                return {'loss': clip_loss + caption_loss}
-                #return {'loss': caption_loss}
-                #return {'loss': clip_loss}
+            losses = None
+            if self.use_clip_loss:
+                losses = clip_loss
+                if self.use_itm_loss:
+                    losses += itm_loss
+                if self.use_generation_loss:
+                    losses += caption_loss
+                return {'loss': losses}
 
+            if self.prompt_list:
+                prompt = random.choice(self.prompt_list)
+                img_embeds, atts_img = self.prompt_wrap(img_embeds, atts_img, prompt)
+ 
             self.llama_tokenizer.padding_side = "right"
 
             text = [t + self.end_sym for t in samples["text_input"]]
@@ -884,7 +1096,10 @@ class VideoLLAMA(Blip2Base):
         imagebind_ckpt_path = cfg.get("imagebind_ckpt_path", '/mnt/workspace/ckpt')
 
         use_clip_loss = cfg.get("use_clip_loss", False)
+        use_generation_loss = cfg.get("use_generation_loss", False)
+        use_itm_loss = cfg.get("use_itm_loss", True)
         clip_dim_size = cfg.get("clip_dim_size", 256)
+        num_videoq_hidden_layers = cfg.get('num_videoq_hidden_layers', 4)
 
         model_type = cfg.get("model_type", None)
 
@@ -917,8 +1132,11 @@ class VideoLLAMA(Blip2Base):
             equip_audio_branch = equip_audio_branch,
             llama_proj_model = llama_proj_model,
             use_clip_loss = use_clip_loss,
+            use_generation_loss = use_generation_loss,
+            use_itm_loss = use_itm_loss,
             clip_dim_size = clip_dim_size,
-            model_type = model_type
+            model_type = model_type,
+            num_videoq_hidden_layers = num_videoq_hidden_layers,
         )
 
         ckpt_path = cfg.get("ckpt", "")  # load weights of MiniGPT-4
