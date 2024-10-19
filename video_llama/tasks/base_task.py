@@ -14,6 +14,7 @@ from video_llama.common.dist_utils import get_rank, get_world_size, is_main_proc
 from video_llama.common.logger import MetricLogger, SmoothedValue
 from video_llama.common.registry import registry
 from video_llama.datasets.data_utils import prepare_sample
+import signal
 
 
 class BaseTask:
@@ -202,9 +203,19 @@ class BaseTask:
             if i >= iters_per_epoch:
                 break
 
-            samples = next(data_loader)
+            try:
+                def timeout_handler(signum, frame):
+                    raise Exception("Function took too long to execute")
 
-            samples = prepare_sample(samples, cuda_enabled=cuda_enabled)
+                signal.signal(signal.SIGALRM, timeout_handler)
+                timeout_duration = 5*60 # 5 minutes
+                signal.alarm(timeout_duration)
+                samples = next(data_loader)
+                samples = prepare_sample(samples, cuda_enabled=cuda_enabled)
+                signal.alarm(0)
+            except Exception as e:
+                print(e)
+                continue
             samples.update(
                 {
                     "epoch": inner_epoch,

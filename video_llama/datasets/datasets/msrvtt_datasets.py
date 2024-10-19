@@ -47,7 +47,10 @@ class MSRVTTDataset(BaseDataset):
 
     def _load_annotations(self, ann_root):
         data = json.load(open(ann_root))['annotations']
-        test_videos = open('/mnt/g/msrvtt/MSRVTT/MSRVTT/high-quality/structured-symlinks/test_list_full.txt').read().split('\n')
+        #test_videos = open('/mnt/g/msrvtt/MSRVTT/MSRVTT/high-quality/structured-symlinks/test_list_full.txt').read().split('\n')
+        # March2024: Evals actually use this data.
+        # Same videos listed as: /mnt/g/msrvtt/MSRVTT/MSRVTT/structured-symlinks/msrvtt_ret_test1k.json
+        test_videos = open('/mnt/g/msrvtt/MSRVTT/MSRVTT/high-quality/structured-symlinks/val_list_jsfusion.txt').read().split('\n')
         filtered_data = []
         for d in data:
             if d['image_id'] not in test_videos:
@@ -460,8 +463,19 @@ class WebvidDatasetEvalDataset(BaseDataset):
 
 if __name__ == '__main__':
     from video_llama.processors.base_processor import BaseProcessor
-    vis_root = '/mnt/g/video_caption_dataset/*/*/data/chunked_videos_30s/'
-    ann_root = '/mnt/g/video_caption_dataset/*/*/data/captions/'
-    vis_processor = BaseProcessor()
+    from video_llama.processors import transforms_video, AlproVideoTrainProcessor
+
+    ann_root = '/mnt/g/msrvtt/MSRVTT/MSRVTT/annotation/MSR_VTT.json'
+    vis_root = '/mnt/g/msrvtt/MSRVTT/MSRVTT/videos/all'
+    vis_processor = AlproVideoTrainProcessor(
+        image_size=224,
+        mean=None,
+        std=None,
+        min_scale=0.5,
+        max_scale=1.0,
+        n_frms=16,
+        )
     text_processor = BaseProcessor()
-    dataset = KineticsDataset(vis_processor, text_processor, vis_root, ann_root)
+    dataset = MSRVTTDataset(vis_processor, text_processor, vis_root, ann_root)
+    for i in range(10):
+        print(dataset[i]['text_input'])

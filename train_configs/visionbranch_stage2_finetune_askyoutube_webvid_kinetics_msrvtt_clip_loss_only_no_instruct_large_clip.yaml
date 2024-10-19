@@ -21,7 +21,7 @@ model:
   #ckpt: "/mnt/g/videollama/Video-LLaMA-Series/finetune-vicuna7b-v2.pth"   # you can use our pretrained ckpt from https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Pretrained/
   #ckpt: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231203003/checkpoint_9.pth"
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207011/checkpoint_9.pth'
-  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231231031/checkpoint_99.pth'
+  ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20240104150/checkpoint_41.pth'
 
 
   # only train vision branch
@@ -140,7 +140,7 @@ run:
   warmup_steps: 50 #1000
 
   seed: 42
-  output_dir: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune"
+  output_dir: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt"
 
   amp: True
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231112022/checkpoint_3.pth"
@@ -157,7 +157,7 @@ run:
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231203144/checkpoint_7.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231206211/checkpoint_1.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207145/checkpoint_0.pth"
-  resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20240102115/checkpoint_14.pth'
+  resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt/20240109163/checkpoint_31.pth"
 
 
   evaluate: False 

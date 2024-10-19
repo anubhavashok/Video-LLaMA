@@ -23,6 +23,7 @@ from video_llama.common.logger import MetricLogger
 from video_llama.models.base_model import BaseModel
 from video_llama.models.Qformer import BertConfig, BertLMHeadModel
 from video_llama.models.eva_vit import create_eva_vit_g
+from video_llama.models.clip_vit import create_clip_vit_L
 from transformers import BertTokenizer
 
 
@@ -62,10 +63,15 @@ class Blip2Base(BaseModel):
     def init_vision_encoder(
         cls, model_name, img_size, drop_path_rate, use_grad_checkpoint, precision
     ):
-        assert model_name == "eva_clip_g", "vit model must be eva_clip_g for current version of MiniGPT-4"
-        visual_encoder = create_eva_vit_g(
-            img_size, drop_path_rate, use_grad_checkpoint, precision
-        )
+        # TODO: Replace vision encoder with LLaVA.
+        #assert model_name == "eva_clip_g", "vit model must be eva_clip_g for current version of MiniGPT-4"
+        if model_name == 'clip_vit_L':
+            print('Using clip_vit_L')
+            visual_encoder = create_clip_vit_L(img_size, use_grad_checkpoint, precision)
+        else:
+            visual_encoder = create_eva_vit_g(
+                img_size, drop_path_rate, use_grad_checkpoint, precision
+            )
 
         ln_vision = LayerNorm(visual_encoder.num_features)
         return visual_encoder, ln_vision

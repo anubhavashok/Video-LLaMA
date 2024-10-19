@@ -324,6 +324,7 @@ if __name__ == '__main__':
     #eval_config = 'eval_configs/video_llama_eval_only_vl.yaml'
     #eval_config = 'eval_configs/video_llama_eval_only_vl_askyoutube_instruct_ft_no_transcripts.yaml'
     eval_config = 'eval_configs/video_llama_eval_only_vl_askyoutube_instruct_ft_no_transcripts_clip.yaml'
+    eval_config = 'eval_configs/video_llama_eval_only_vl_phi3_clipL.yaml'
     gpu_id = 0
     model_type = 'vicuna'
     args = {'cfg_path': eval_config, 'gpu_id': gpu_id,

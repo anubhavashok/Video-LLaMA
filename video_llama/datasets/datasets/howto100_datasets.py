@@ -23,8 +23,9 @@ import json
 import transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaTokenizer
 import copy
+import pickle
 
-class AskYoutubeDataset(BaseDataset):
+class HowTo100Dataset(BaseDataset):
     def __init__(self, vis_processor, text_processor, vis_root, ann_root):
         """
         vis_root (string): Root directory of video (e.g. webvid_eval/video/)
@@ -36,81 +37,50 @@ class AskYoutubeDataset(BaseDataset):
         ts_df = []
 
         self.video_paths = self._load_video_paths(vis_root)
-        self.annotation = self._load_annotations(ann_root) 
+        print(self.video_paths)
+        self.annotation = self._load_annotations(ann_root)
+        print(len(self.annotation))
         self.vis_root = vis_root
         self.resize_size = 224
         self.num_frm = self.vis_processor.n_frms
         self.frm_sampling_strategy = 'headtail'
 
     def _load_video_paths(self, vis_root):
-        return dict([(path.split('/')[-1], path) for path in glob.glob(os.path.join(vis_root, '*'))])
+        return dict([(os.path.splitext(os.path.basename(path))[0], path) for path in glob.glob(os.path.join(vis_root, '*.avi'))])
 
-    def _load_annotations(self, ann_root):
-        #captions_files = glob.glob(os.path.join(ann_root, '*', 'chunked_captions_30s.json'))
-        #captions_files = glob.glob(os.path.join(ann_root, '*', 'chunked_captions_30s_clean.json'))
-        captions_files = glob.glob(os.path.join(ann_root, '*', 'joined_chunked_30s_captions_gpt4v.json'))
-        all_captions = []
-        for captions_file in captions_files:
-            video_id = os.path.dirname(captions_file).split('/')[-1]
-            if video_id not in self.video_paths:
-                continue
-            with open(captions_file, 'r') as f:
-                captions = json.load(f)
-            # combine captions.
-            for i, chunk in enumerate(captions):
-                if 'transcript' in chunk:
-                    if 'bad' in chunk and chunk['bad'] or len(chunk['transcript']) == 0:
-                        continue
-                    if not self._check_video_chunk_exists(video_id, i):
-                        continue
-                    all_captions.append({'video_id': video_id, 'seq_num': chunk['chunk_idx'], 'caption': chunk['transcript']})
-                    continue
-                else:
-                    continue
-                #cap = '\n'.join(['\n'.join([s['utf8'] for s in seg['segs']]) for seg in chunk])
-                cap = ''
-                for seg in chunk:
-                    if "dDurationMs" not in seg or ('aAppend' in seg and seg['aAppend']):
-                        continue
-                    cap += '\n' + ''.join([s['utf8'] for s in seg['segs']])
-                cap = cap.replace('\n\n\n', '\n')
-                cap = cap.replace('\n\n', '\n')
-                m = {'video_id': video_id, 'seq_num': i, 'caption': cap}
-                if not self._check_video_chunk_exists(video_id, i):
-                    continue
-                all_captions.append({'video_id': video_id, 'seq_num': i, 'caption': cap})
-        return pd.DataFrame(all_captions)
+    def _load_annotations(self, ann_root, num_captions=10):
+        data = pickle.load(open('/mnt/h/datasets/msvd/raw-captions.pkl', 'rb'))
+        train_videos_list = open(ann_root).read().split('\n')
+        filtered_data = []
+        for video_id in train_videos_list:
+            if video_id in data:
+                for annotation in data[video_id][:num_captions]:
+                    annotation = ' '.join(annotation)
+                    d = {'video_id': video_id, 'caption': annotation}
+                    filtered_data.append(d)
+        return filtered_data
 
     def _check_video_chunk_exists(self, video_id, i):
-        video_path = os.path.join(self.video_paths[video_id], f'chunk_{i}.mp4')
+        video_path = os.path.join(self.video_paths[video_id])
         return os.path.exists(video_path)
 
     def __getitem__(self, index):
         #index = index % 2
         num_retries = 10  # skip error videos
         for _ in range(num_retries):
-            sample = self.annotation.iloc[index]
-            sample_dict = sample.to_dict()
+            #sample = self.annotation.iloc[index]
+            sample = self.annotation[index]
+            sample_dict = sample#.to_dict()
+
             video_id = sample_dict['video_id']
+            text = sample_dict['caption']
 
-            if 'caption' in sample_dict.keys():
-                text = sample_dict['caption'].strip()
-                text = text.replace('\n', ' ')
-                #print(f'Caption {index}: ', text)
-            else:
-                raise NotImplementedError("Un-supported text annotation format.")
-
-            # fetch video
-            i = sample_dict['seq_num']
-            #print(index, self.video_paths[video_id], i)
-            video_path = os.path.join(self.video_paths[video_id], f'chunk_{i}.mp4')
-            # if os.path.exists(video_path):
             try:
+                video_path = self.video_paths[video_id]
                 video = self.vis_processor(video_path)
                 #print('video: ', video)
-            except Exception as e:
-                print(e)
-                print(f"Failed to load examples with video: {video_path}. "
+            except:
+                print(f"Failed to load examples with video: {video_id}. "
                             f"Will randomly sample an example as a replacement.")
                 index = random.randint(0, len(self) - 1)
                 continue
@@ -145,7 +115,7 @@ class AskYoutubeDataset(BaseDataset):
     #     return new_result
 
 
-class AskYoutubeInstructDataset(BaseDataset):
+class MSVDInstructDataset(BaseDataset):
     def __init__(self, vis_processor, text_processor, vis_root, ann_root, num_video_query_token=32, tokenizer_name = '/mnt/workspace/ckpt/vicuna-13b/', data_type = 'video', model_type='vicuna'):
         """
         vis_root (string): Root directory of video (e.g. webvid_eval/video/)
@@ -497,10 +467,8 @@ class WebvidDatasetEvalDataset(BaseDataset):
 if __name__ == '__main__':
     from video_llama.processors.base_processor import BaseProcessor
     from video_llama.processors import transforms_video, AlproVideoTrainProcessor
-
-    vis_root = '/mnt/g/video_caption_dataset/*/*/data/chunked_videos_30s/'
-    ann_root = '/mnt/g/video_caption_dataset/*/*/data/captions/'
-
+    vis_root = '/mnt/h/datasets/msvd/videos/'
+    ann_root = '/mnt/h/datasets/msvd/trainval_list.txt'
     vis_processor = AlproVideoTrainProcessor(
         image_size=224,
         mean=None,
@@ -510,6 +478,4 @@ if __name__ == '__main__':
         n_frms=16,
         )
     text_processor = BaseProcessor()
-    dataset = AskYoutubeDataset(vis_processor, text_processor, vis_root, ann_root)
-    for i in range(10):
-        print(dataset[i]['text_input'])
+    dataset = HowTo100Dataset(vis_processor, text_processor, vis_root, ann_root)

@@ -355,3 +355,7 @@ def _mask_targets(target, tokenized_lens, speakers):
         if speaker == "human":
             target[cur_idx+2:cur_idx + tokenized_len] = IGNORE_INDEX
         cur_idx += tokenized_len
+
+if __name__ == '__main__':
+    pass
+

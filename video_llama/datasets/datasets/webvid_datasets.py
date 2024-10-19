@@ -136,3 +136,22 @@ class WebvidDatasetEvalDataset(BaseDataset):
         }
 
 
+if __name__ == '__main__':
+    from video_llama.processors.base_processor import BaseProcessor
+    from video_llama.processors import transforms_video, AlproVideoTrainProcessor
+
+    ann_root = "/mnt/f/videollama/datasets/webvid/results_2M_train_1/"
+    vis_root = "/mnt/f/videollama/datasets/webvid/data/videos"
+
+    vis_processor = AlproVideoTrainProcessor(
+        image_size=224,
+        mean=None,
+        std=None,
+        min_scale=0.5,
+        max_scale=1.0,
+        n_frms=16,
+        )
+    text_processor = BaseProcessor()
+    dataset = WebvidDataset(vis_processor, text_processor, vis_root, ann_root)
+    for i in range(10):
+        print(dataset[i]['text_input'])

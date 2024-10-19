@@ -1,0 +1,241 @@
+model:
+  arch: video_model
+  vit_model: "clip_vit_L"
+  model_type: pretrain_vicuna
+  freeze_vit: True
+  freeze_qformer: False #True
+
+  low_resource: False
+  #use_cache: True
+  use_grad_checkpoint: False # True
+
+  # Q-Former
+  num_query_token: 32
+
+  # If you want train models based on LLaMA-2-chat,
+  # some ckpts could be download from our provided huggingface repo
+  # i.e.  https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Finetuned
+  llama_model: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+  imagebind_ckpt_path: "/mnt/g/videollama/imagebind/imagebind_huge.pth"
+
+  ckpt: "/mnt/h/videollama_ckpts/output/video_model/20240724234/checkpoint_99.pth"
+
+
+  # only train vision branch
+  equip_audio_branch: False  # whether equips the audio branch
+  frozen_llama_proj: False
+  frozen_video_Qformer: False
+  frozen_audio_Qformer: True
+  
+  fusion_head_layers: 2
+  max_frame_pos: 32
+  fusion_header_type: "seqTransf"
+  max_txt_len: 320
+
+  # vicuna and llama_2_chat use different template !!!
+
+  # for llama_2_chat:
+  # end_sym: "</s>"
+  # prompt_path: "prompts/alignment_image.txt"
+  # prompt_template: '[INST] <<SYS>>\n \n<</SYS>>\n\n{} [/INST] '
+
+  # for vicuna:
+  end_sym: "###"
+  prompt_path: "prompts/alignment_image.txt"
+  prompt_template: '###Human: {} ###Assistant: '
+
+  # New
+  use_clip_loss: True
+  use_itm_loss: False
+  use_generation_loss: False
+  clip_dim_size: 1024
+  
+
+datasets:    
+  askyoutube:
+    data_type: video
+    build_info:
+      anno_dir: /mnt/g/video_caption_dataset/*/*/data/captions/
+      videos_dir: /mnt/g/video_caption_dataset/*/*/data/chunked_videos_30s/
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 10
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+  webvid:
+    data_type: video
+    build_info:
+      anno_dir: /mnt/f/videollama/datasets/webvid/results_2M_train_1/
+      videos_dir: /mnt/f/videollama/datasets/webvid/data/videos
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 33
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+    #  kinetics:
+    #    data_type: video
+    #    build_info:
+    #      anno_dir: /mnt/g/kinetics/k400/annotations/train.csv
+    #      videos_dir: /mnt/g/kinetics/k400/train
+    #    vis_processor:
+    #      train:
+    #        name: "alpro_video_train"
+    #        n_frms: 16
+    #        image_size: 224
+    #    text_processor:
+    #      train:
+    #        name: "blip_caption"
+    #    num_video_query_token: 32
+    #    sample_ratio: 33
+    #    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    #    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+  msrvtt:
+    data_type: video
+    build_info:
+      anno_dir: /mnt/g/msrvtt/MSRVTT/MSRVTT/annotation/MSR_VTT.json
+      videos_dir: /mnt/g/msrvtt/MSRVTT/MSRVTT/videos/all
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 33
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+  msvd:
+    data_type: video
+    build_info:
+      anno_dir: /mnt/h/datasets/msvd/trainval_list.txt
+      videos_dir: /mnt/h/datasets/msvd/videos/
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 33
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+  videochatgptcaptions:
+    data_type: video
+    build_info:
+      anno_dir: "/mnt/g/video_chatgpt/Test_Human_Annotated_Captions"
+      videos_dir: "/mnt/g/video_chatgpt/Test_Videos"
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 33
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+
+  finevideo:
+    data_type: video
+    build_info:
+      videos_dir: "/mnt/h/datasets/finevideo"
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 33
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+
+  valley:
+    data_type: video
+    build_info:
+      anno_dir: "/mnt/h/datasets/valley/Valley-Instruct-73k/description_detailed_10k.json"
+      videos_dir: "/mnt/h/datasets/valley/Valley-Instruct-73k/detailed_description_videos/"
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 33
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+    #  msvd:
+    #data_type: video
+    #build_info:
+    #  anno_dir: /mnt/h/datasets/msvd/trainval_list.txt
+    #  videos_dir: /mnt/h/datasets/msvd/videos/
+    #vis_processor:
+    #  train:
+    #    name: "alpro_video_train"
+    #    n_frms: 16
+    #    image_size: 224
+    #text_processor:
+    #  train:
+    #    name: "blip_caption"
+    #num_video_query_token: 32
+    #sample_ratio: 23
+    #tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    #model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+ 
+run:
+  task: video_text_pretrain
+  # optimizer
+  lr_sched: "linear_warmup_cosine_lr"
+  init_lr: 3e-5
+  min_lr: 1e-5
+  warmup_lr: 1e-6
+
+  weight_decay: 0.05
+  max_epoch: 100
+  iters_per_epoch: 1000
+  batch_size_train: 16 #32
+  batch_size_eval: 1
+  num_workers: 8
+  warmup_steps: 50 #1000
+
+  seed: 42
+  output_dir: "/mnt/h/videollama_ckpts/output/video_model_w_finevideo_no_freeze_lm"
+
+  amp: True
+  #resume_ckpt_path: '/mnt/h/videollama_ckpts/output/video_model_w_finevideo/20240929162/checkpoint_4.pth'
+  #resume_ckpt_path: '/mnt/h/videollama_ckpts/output/video_model/20240723133/checkpoint_21.pth'
+  resume_ckpt_path: '/mnt/h/videollama_ckpts/output/video_model_w_finevideo_no_freeze_lm/20241017140/checkpoint_25.pth'
+
+
+  evaluate: False 
+  train_splits: ["train"]
+
+  device: "cuda"
+  world_size: 1
+  dist_url: "env://"
+  distributed: True

@@ -1,0 +1,6 @@
+datasets:
+  valley:
+    data_type: video
+    build_info:
+      anno_dir: path/askyoutube/askyoutube_train_data/annotations/
+      videos_dir: path/askyoutube/askyoutube_train_data/videos/

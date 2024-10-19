@@ -155,6 +155,7 @@ def embed_text_itm(model, prompt, video_emb):
 
     attention_mask = torch.cat([query_atts, inputs.attention_mask], dim=1)
     video_atts = torch.ones(video_emb.size()[:-1], dtype=torch.long).to(video_emb.device)
+    print(query_tokens.size(), query_atts.size(), attention_mask.size(), video_emb.size(), video_atts.size())
 
     output_itm = model.video_Qformer.bert(
             inputs.input_ids,
@@ -270,12 +271,36 @@ def rank_matches_videoq(query_video_path, video_paths, model, vis_processor):
     for video_path, dists in sorted_dists:
         print(video_path, dists.cpu().detach().numpy().item())
 
+def rank_matches_query_modulated(query, query_video_path, video_paths, model, vis_processor):
+    #text_embs = get_text_embedding_qformer(prompts, model)
+    video_embs, convs = get_all_video_embeddings(video_paths, model, vis_processor)
+    #query_video_emb, convs = get_all_video_embeddings([query_video_path], model, vis_processor)
+
+    conv = default_conversation.copy()
+    conv.system = "You are able to understand the visual content that the user provides. Answer the questions from the video."
+    _, query_video_emb = upload_video(model, query_video_path, vis_processor, conv, [], output_video_embedding=True)
+    print(query_video_emb.size())
+    #query_video_emb = query_video_emb.unsqueeze(0)
+    #query_video_emb = query_video_emb[0]
+    #query_text_emb = embed_text_itc(model, query)
+    query_emb = embed_text_itm(model, query, query_video_emb)
+    query_emb = model.vision_proj(query_emb)
+    #query_emb = (query_video_emb + query_text_emb)/2
+    dists = compute_dist_videoq(model, query_emb, video_embs)
+
+    sorted_dists = sorted(list(zip(video_paths, dists)), key=lambda x: x[1])
+    for video_path, dists in sorted_dists:
+        print(video_path, dists.cpu().detach().numpy().item())
+
+
+
 if __name__ == '__main__':
     #eval_config = 'eval_configs/video_llama_eval_only_vl_askyoutube_instruct_ft_no_transcripts_clip.yaml'
     #eval_config = 'eval_configs/video_llama_eval_only_vl_askyoutube_instruct_ft_clip.yaml'
     #eval_config = 'eval_configs/video_llama_eval_only_vl_askyoutube_webvid_videochatgpt_clip_instruct_ft_mistral.yaml'
-    eval_config = 'eval_configs/video_llama_eval_only_vl_askyoutube_webvid_videochatgpt_clip_instruct_ft_llm_and_clip_tr.yaml'
-    #eval_config = 'eval_configs/video_clip_kinetics_all_data.yaml'
+    #eval_config = 'eval_configs/video_llama_eval_only_vl_askyoutube_webvid_videochatgpt_clip_instruct_ft_llm_and_clip_tr.yaml'
+    eval_config = 'eval_configs/video_clip_kinetics_all_data.yaml'
+    eval_config = 'eval_configs/video_clip_kinetics_msrvtt_meanqt_centercrop.yaml'
 
     gpu_id = 0
     model_type = 'vicuna'
@@ -289,6 +314,10 @@ if __name__ == '__main__':
     video_paths = glob.glob('/mnt/g/video_caption_dataset/education/national_geographic/data/chunked_videos_30s/*/*.mp4')#[-150:-50]
     #video_paths = glob.glob('/mnt/g/video_caption_dataset/education/daily_dose_of_internet/data/chunked_videos_30s/*/*.mp4')#[-150:-50]
 
+    query = 'What are the animals in this video?'
+    query_video_path = '/home/bhavashok/experiments/askvideos_clip/data/a_zebra_in_an_african_savannah_k1I4_jvO4fI.mp4'
+    rank_matches_query_modulated(query, query_video_path, video_paths, model, vis_processor)
+    exit()
     #pos = 'Does this video have a dog in it?'
     #neg = 'This video has a dog in it.'
     #prompt = 'cobra'

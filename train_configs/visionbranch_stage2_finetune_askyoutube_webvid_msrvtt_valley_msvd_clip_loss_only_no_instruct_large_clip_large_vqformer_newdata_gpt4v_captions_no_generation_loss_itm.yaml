@@ -18,11 +18,12 @@ model:
   imagebind_ckpt_path: "/mnt/g/videollama/imagebind/imagebind_huge.pth"
 
   # The ckpt of vision branch after stage1 pretrained, 
-  ckpt: "/mnt/g/videollama/Video-LLaMA-Series/finetune-vicuna7b-v2.pth"   # you can use our pretrained ckpt from https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Pretrained/
+  #ckpt: "/mnt/g/videollama/Video-LLaMA-Series/finetune-vicuna7b-v2.pth"   # you can use our pretrained ckpt from https://huggingface.co/DAMO-NLP-SG/Video-LLaMA-2-13B-Pretrained/
   #ckpt: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_instruct/20231203003/checkpoint_9.pth"
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207011/checkpoint_9.pth'
   #ckpt: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20240104150/checkpoint_41.pth'
   #ckpt: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt/20240120204/checkpoint_96.pth"
+  ckpt: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_askyoutube_msrvtt_newdata_valley_no_kinetics_gpt4v_no_captions/20240314192/checkpoint_99.pth"
 
 
   # only train vision branch
@@ -50,6 +51,8 @@ model:
 
   # New
   use_clip_loss: True
+  use_itm_loss: True
+  use_generation_loss: False
   clip_dim_size: 1024
   
 
@@ -61,14 +64,14 @@ datasets:
       videos_dir: /mnt/g/video_caption_dataset/*/*/data/chunked_videos_30s/
     vis_processor:
       train:
-        name: "resize_centercrop_video_train"
+        name: "alpro_video_train"
         n_frms: 16
         image_size: 224
     text_processor:
       train:
         name: "blip_caption"
     num_video_query_token: 32
-    sample_ratio: 33
+    sample_ratio: 10
     tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
     model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
   webvid:
@@ -78,7 +81,7 @@ datasets:
       videos_dir: /mnt/f/videollama/datasets/webvid/data/videos
     vis_processor:
       train:
-        name: "resize_centercrop_video_train"
+        name: "alpro_video_train"
         n_frms: 16
         image_size: 224
     text_processor:
@@ -88,23 +91,23 @@ datasets:
     sample_ratio: 33
     tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
     model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
-  kinetics:
-    data_type: video
-    build_info:
-      anno_dir: /mnt/g/kinetics/k400/annotations/train.csv
-      videos_dir: /mnt/g/kinetics/k400/train
-    vis_processor:
-      train:
-        name: "resize_centercrop_video_train"
-        n_frms: 16
-        image_size: 224
-    text_processor:
-      train:
-        name: "blip_caption"
-    num_video_query_token: 32
-    sample_ratio: 33
-    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
-    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+    #  kinetics:
+    #    data_type: video
+    #    build_info:
+    #      anno_dir: /mnt/g/kinetics/k400/annotations/train.csv
+    #      videos_dir: /mnt/g/kinetics/k400/train
+    #    vis_processor:
+    #      train:
+    #        name: "alpro_video_train"
+    #        n_frms: 16
+    #        image_size: 224
+    #    text_processor:
+    #      train:
+    #        name: "blip_caption"
+    #    num_video_query_token: 32
+    #    sample_ratio: 33
+    #    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    #    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
   msrvtt:
     data_type: video
     build_info:
@@ -112,7 +115,7 @@ datasets:
       videos_dir: /mnt/g/msrvtt/MSRVTT/MSRVTT/videos/all
     vis_processor:
       train:
-        name: "resize_centercrop_video_train"
+        name: "alpro_video_train"
         n_frms: 16
         image_size: 224
     text_processor:
@@ -122,7 +125,58 @@ datasets:
     sample_ratio: 33
     tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
     model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
- 
+  msvd:
+    data_type: video
+    build_info:
+      anno_dir: /mnt/h/datasets/msvd/trainval_list.txt
+      videos_dir: /mnt/h/datasets/msvd/videos/
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 33
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+  valley:
+    data_type: video
+    build_info:
+      anno_dir: /mnt/h/datasets/valley/Valley-Instruct-73k/description_detailed_10k.json
+      videos_dir: /mnt/h/datasets/valley/Valley-Instruct-73k/detailed_description_videos/
+    vis_processor:
+      train:
+        name: "alpro_video_train"
+        n_frms: 16
+        image_size: 224
+    text_processor:
+      train:
+        name: "blip_caption"
+    num_video_query_token: 32
+    sample_ratio: 33
+    tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
+
+    #  msvd:
+    #data_type: video
+    #build_info:
+    #  anno_dir: /mnt/h/datasets/msvd/trainval_list.txt
+    #  videos_dir: /mnt/h/datasets/msvd/videos/
+    #vis_processor:
+    #  train:
+    #    name: "alpro_video_train"
+    #    n_frms: 16
+    #    image_size: 224
+    #text_processor:
+    #  train:
+    #    name: "blip_caption"
+    #num_video_query_token: 32
+    #sample_ratio: 23
+    #tokenizer_name: "/mnt/e/llms/oogabooga_model/vicuna-7bv1.1"
+    #model_type: "vicuna"  # need to set, as vicuna and llama_2_chat use different template
  
 run:
   task: video_text_pretrain
@@ -141,9 +195,10 @@ run:
   warmup_steps: 50 #1000
 
   seed: 42
-  output_dir: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt_meanqt_centercrop"
+  output_dir: "/mnt/h/videollama_ckpts/output/videollama_stage2_finetune_askyoutube_msrvtt_newdata_valley_no_kinetics_gpt4v_no_captions_itm"
 
   amp: True
+  #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt_newdata/20240215002/checkpoint_50.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231112022/checkpoint_3.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231027044/checkpoint_4.pth"
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231023163/checkpoint_1.pth" #null
@@ -159,7 +214,15 @@ run:
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231206211/checkpoint_1.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207145/checkpoint_0.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt/20240109163/checkpoint_31.pth"
-  resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt_meanqt_centercrop/20240202021/checkpoint_12.pth"
+  #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt/20240201115/checkpoint_63.pth'
+  #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt_newdata_no_kinetics_askyoutube/20240222223/checkpoint_99_epch0.pth'
+  #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_askyoutube_msrvtt_newdata_no_kinetics/20240224184/checkpoint_41.pth'
+  #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_askyoutube_msrvtt_newdata_no_kinetics/20240226145/checkpoint_97_epoch0.pth'
+  #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_askyoutube_msrvtt_newdata_valley_no_kinetics/20240229030/checkpoint_1.pth'
+  #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_askyoutube_msrvtt_newdata_valley_no_kinetics_gpt4v_no_captions/20240312184/checkpoint_78.pth'
+  #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_askyoutube_msrvtt_newdata_valley_no_kinetics_gpt4v_no_captions/20240316161/checkpoint_13.pth'
+  resume_ckpt_path: '/mnt/h/videollama_ckpts/output/videollama_stage2_finetune_askyoutube_msrvtt_newdata_valley_no_kinetics_gpt4v_no_captions/20240422120/checkpoint_65.pth'
+
 
   evaluate: False 
   train_splits: ["train"]

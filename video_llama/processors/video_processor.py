@@ -67,6 +67,54 @@ def load_video(video_path, n_frms=MAX_INT, height=-1, width=-1, shortest_side=No
     msg = f"The video contains {len(indices)} frames sampled at {sec} seconds. "
     return frms, msg
 
+def load_video_timestamps(video_path, n_frms=MAX_INT, height=-1, width=-1, shortest_side=None, sampling="uniform", return_msg=False, start_timestamp=0, end_timestamp=None):
+    decord.bridge.set_bridge("torch")
+
+    # Load video using shortest side or specified height and width
+    if shortest_side is not None:
+        vr = VideoReader(uri=video_path, width=shortest_side)
+    else:
+        vr = VideoReader(uri=video_path, height=height, width=width)
+
+    vlen = len(vr)
+    fps = float(vr.get_avg_fps())
+
+    # Convert timestamps to frame indices
+    start_frame = int(start_timestamp * fps)
+    end_frame = int(end_timestamp * fps) if end_timestamp is not None else vlen
+
+    # Ensure valid frame range
+    start_frame = max(0, start_frame)
+    end_frame = min(vlen, end_frame)
+
+    # Adjust the number of frames to sample based on start and end frames
+    n_frms = min(n_frms, end_frame - start_frame)
+    #print(start_frame, end_frame, n_frms, start_timestamp, end_timestamp)
+
+    if sampling == "uniform":
+        indices = np.arange(start_frame, end_frame, (end_frame - start_frame) / n_frms).astype(int).tolist()
+    elif sampling == "headtail":
+        mid_point = (start_frame + end_frame) // 2
+        indices_h = sorted(rnd.sample(range(start_frame, mid_point), n_frms // 2))
+        indices_t = sorted(rnd.sample(range(mid_point, end_frame), n_frms // 2))
+        indices = indices_h + indices_t
+    else:
+        raise NotImplementedError
+
+    # Retrieve frames and adjust format
+    temp_frms = vr.get_batch(indices)
+    tensor_frms = torch.from_numpy(temp_frms) if type(temp_frms) is not torch.Tensor else temp_frms
+    frms = tensor_frms.permute(3, 0, 1, 2).float()  # (C, T, H, W)
+
+    if not return_msg:
+        return frms
+
+    # Create message with frame timestamps
+    sec = ", ".join([str(round(f / fps, 1)) for f in indices])
+    msg = f"The video contains {len(indices)} frames sampled at {sec} seconds between timestamps {start_timestamp} and {end_timestamp}."
+    return frms, msg
+
+
 def load_video_all_frames(video_path, frame_sep=4, height=-1, width=-1, return_msg = False):
     decord.bridge.set_bridge("torch")
     vr = VideoReader(uri=video_path, height=height, width=width)
@@ -185,21 +233,31 @@ class AlproVideoTrainProcessor(AlproVideoBaseProcessor):
             ]
         )
 
-    def __call__(self, vpath):
+    def __call__(self, vpath, start_timestamp=None, end_timestamp=None):
         """
         Args:
             clip (torch.tensor): Video clip to be cropped. Size is (C, T, H, W)
         Returns:
             torch.tensor: video clip after transforms. Size is (C, T, size, size).
         """
-        clip = load_video(
-            video_path=vpath,
-            n_frms=self.n_frms,
-            height=self.image_size,
-            width=self.image_size,
-            sampling="headtail",
-        )
-
+        if start_timestamp is not None and end_timestamp is not None:
+            clip = load_video_timestamps(
+                video_path=vpath,
+                n_frms=self.n_frms,
+                height=self.image_size,
+                width=self.image_size,
+                sampling="uniform",
+                start_timestamp=start_timestamp,
+                end_timestamp=end_timestamp,
+            )
+        else:
+            clip = load_video(
+                video_path=vpath,
+                n_frms=self.n_frms,
+                height=self.image_size,
+                width=self.image_size,
+                sampling="headtail",
+            )
         return self.transform(clip)
 
     @classmethod
@@ -315,7 +373,6 @@ class ResizeCenterCropVideoTrainProcessor(AlproVideoBaseProcessor):
             shortest_side=self.image_size,
             #sampling="headtail",
         )
-
         return self.transform(clip)
 
     @classmethod

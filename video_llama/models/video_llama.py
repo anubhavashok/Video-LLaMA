@@ -1002,7 +1002,7 @@ class VideoLLAMA(Blip2Base):
                 prompt = random.choice(self.prompt_list)
                 img_embeds, atts_img = self.prompt_wrap(img_embeds, atts_img, prompt)
  
-            self.llama_tokenizer.padding_side = "right"
+            self.llama_tokenizer.padding_side = "left" if self.model_type == 'phi-3' else "right"
 
             text = [t + self.end_sym for t in samples["text_input"]]
 

@@ -264,7 +264,7 @@ class Chat:
             # image = self.vis_processor(image).unsqueeze(0).to(self.device)
             video, msg = load_video(
                 video_path=video_path,
-                n_frms=8,
+                n_frms=16,
                 height=224,
                 width=224,
                 sampling ="uniform", return_msg = True
@@ -310,7 +310,7 @@ class Chat:
             # image = self.vis_processor(image).unsqueeze(0).to(self.device)
             video, msg = load_video(
                 video_path=video_path,
-                n_frms=8,
+                n_frms=16,
                 height=224,
                 width=224,
                 sampling ="uniform", return_msg = True

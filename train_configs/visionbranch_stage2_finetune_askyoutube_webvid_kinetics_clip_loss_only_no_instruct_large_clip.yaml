@@ -139,7 +139,7 @@ run:
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231203144/checkpoint_7.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231206211/checkpoint_1.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207145/checkpoint_0.pth"
-  resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20240102115/checkpoint_14.pth'
+  resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20240104150/checkpoint_41.pth'
 
 
   evaluate: False 

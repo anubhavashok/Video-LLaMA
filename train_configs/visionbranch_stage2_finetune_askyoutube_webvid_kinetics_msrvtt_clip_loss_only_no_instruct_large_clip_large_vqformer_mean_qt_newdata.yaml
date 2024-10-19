@@ -61,7 +61,7 @@ datasets:
       videos_dir: /mnt/g/video_caption_dataset/*/*/data/chunked_videos_30s/
     vis_processor:
       train:
-        name: "resize_centercrop_video_train"
+        name: "alpro_video_train"
         n_frms: 16
         image_size: 224
     text_processor:
@@ -78,7 +78,7 @@ datasets:
       videos_dir: /mnt/f/videollama/datasets/webvid/data/videos
     vis_processor:
       train:
-        name: "resize_centercrop_video_train"
+        name: "alpro_video_train"
         n_frms: 16
         image_size: 224
     text_processor:
@@ -95,7 +95,7 @@ datasets:
       videos_dir: /mnt/g/kinetics/k400/train
     vis_processor:
       train:
-        name: "resize_centercrop_video_train"
+        name: "alpro_video_train"
         n_frms: 16
         image_size: 224
     text_processor:
@@ -112,7 +112,7 @@ datasets:
       videos_dir: /mnt/g/msrvtt/MSRVTT/MSRVTT/videos/all
     vis_processor:
       train:
-        name: "resize_centercrop_video_train"
+        name: "alpro_video_train"
         n_frms: 16
         image_size: 224
     text_processor:
@@ -141,7 +141,7 @@ run:
   warmup_steps: 50 #1000
 
   seed: 42
-  output_dir: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt_meanqt_centercrop"
+  output_dir: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt_newdata"
 
   amp: True
   #resume_ckpt_path: "/home/bhavashok/Video-LLaMA/video_llama/output/videollama_stage2_finetune/20231112022/checkpoint_3.pth"
@@ -159,7 +159,8 @@ run:
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231206211/checkpoint_1.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune/20231207145/checkpoint_0.pth"
   #resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt/20240109163/checkpoint_31.pth"
-  resume_ckpt_path: "/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt_meanqt_centercrop/20240202021/checkpoint_12.pth"
+  #resume_ckpt_path: '/mnt/g/videollama_ckpts/output/videollama_stage2_finetune_msrvtt/20240201115/checkpoint_63.pth'
+
 
   evaluate: False 
   train_splits: ["train"]
