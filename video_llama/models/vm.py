@@ -75,7 +75,11 @@ class VideoModel(Blip2Base):
         clip_dim_size = 256,
         num_videoq_hidden_layers = 4,
         model_type = None,
-        freeze_lm = True,
+        freeze_lm = False,
+        use_reconstruction_loss = True,
+        mask_ratio = 0.75,
+        reconstruction_hidden_dim = 512,
+        use_position_embeddings=False,
     ):
         super().__init__()
 
@@ -104,8 +108,10 @@ class VideoModel(Blip2Base):
         #num_patches = 1+self.visual_encoder.patch_size**2
         video_encoder_layer = TransformerEncoderLayer(d_model=self.visual_encoder.num_features, nhead=num_heads, dim_feedforward=self.visual_encoder.num_features, batch_first=True)
         self.video_transformer = TransformerEncoder(video_encoder_layer, num_layers=num_layers)
-        self.text_tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
-        self.text_transformer = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
+        #self.text_embedding_model = 'sentence-transformers/all-MiniLM-L6-v2'
+        self.text_embedding_model = 'mixedbread-ai/mxbai-embed-large-v1'
+        self.text_tokenizer = AutoTokenizer.from_pretrained(self.text_embedding_model)
+        self.text_transformer = AutoModel.from_pretrained(self.text_embedding_model)
         
         if freeze_lm:
             for name, param in self.text_transformer.named_parameters():
@@ -120,16 +126,102 @@ class VideoModel(Blip2Base):
         #self.video_transformer = Transformer(d_model=self.visual_encoder.num_features, nhead=num_heads, dim_feedforward=self.visual_encoder.num_features)
         clip_dim = 1024
         self.video_proj = nn.Linear(self.visual_encoder.num_features, clip_dim)
-        self.text_proj = nn.Linear(384, clip_dim)
+        #self.text_proj = nn.Linear(384, clip_dim)
+        self.text_proj = nn.Linear(1024, clip_dim)
         init_logit_scale = 0.07
         self.temperature_parameter = nn.Parameter(torch.ones([]) * init_logit_scale)
         self.temperature_parameter.requires_grad = True
+
+        # Parameters for masking and reconstruction
+        self.use_reconstruction_loss = use_reconstruction_loss
+        if self.use_reconstruction_loss:
+            self.mask_ratio = mask_ratio
+            # Suppose your visual encoder outputs features of shape [B*T, num_patches, hidden_dim]
+            # We'll need a decoder head to reconstruct original pixel patches (or encoded patches).
+            # This is a simplistic example: a small MLP to go from encoder dim -> image patch dim.
+            self.reconstruction_decoder = nn.Sequential(
+                nn.Linear(self.visual_encoder.num_features, reconstruction_hidden_dim),
+                nn.ReLU(),
+                nn.Linear(reconstruction_hidden_dim, self.visual_encoder.num_features)
+            )
+
+        self.use_position_embeddings = use_position_embeddings
+        if self.use_position_embeddings:
+            max_frames = 32                 # or whatever maximum #frames you expect
+            num_patches = 257              # typically 1 (class token) + patches; or see your actual encoder's output
+            max_seq_len = max_frames * num_patches
+            self.video_position_embedding = nn.Embedding(max_seq_len, self.visual_encoder.num_features)
 
     def vit_to_cpu(self):
         self.ln_vision.to("cpu")
         self.ln_vision.float()
         self.visual_encoder.to("cpu")
         self.visual_encoder.float()
+
+    def mask_patches(self, video, patch_size=16):
+        """
+        Mask a subset of patches in the video.
+        video: B x C x T x H x W
+        We'll assume your vision encoder takes patches of size 16x16 (adjust if needed).
+        
+        Steps:
+        1. Extract patches from video
+        2. Create a mask
+        3. Apply the mask to patches
+        """
+        B, C, T, H, W = video.shape
+        # Compute the number of patches along H and W
+        # For simplicity, assume H and W are divisible by patch_size
+        num_patches_h = H // patch_size
+        num_patches_w = W // patch_size
+        num_patches = num_patches_h * num_patches_w
+        
+        # Rearrange video into patches: [B, C, T, num_patches, patch_size, patch_size]
+        patches = einops.rearrange(video, 
+                                   'b c t (nh ph) (nw pw) -> b t (nh nw) c ph pw',
+                                   ph=patch_size, pw=patch_size, nh=num_patches_h, nw=num_patches_w)
+        
+        # Now patches is B x T x (num_patches) x C x ph x pw
+        # Flatten time and batch for easier masking: [B*T, num_patches, C, ph, pw]
+        BT = B*T
+        patches = patches.reshape(BT, num_patches, C, patch_size, patch_size)
+        
+        # Generate a random mask for patches
+        num_masked = int(self.mask_ratio * num_patches)
+        # For simplicity, mask the same number of patches in each sample
+        # A better approach: mask randomly per sample.
+        mask = torch.zeros(BT, num_patches, dtype=torch.bool, device=video.device)
+        for i in range(BT):
+            # Randomly choose patches to mask
+            perm = torch.randperm(num_patches, device=video.device)
+            masked_indices = perm[:num_masked]
+            mask[i, masked_indices] = True
+
+        # Create a masked version of the patches
+        masked_patches = patches.clone()
+        # You can either replace masked patches with 0 or a learned embedding
+        masked_patches[mask] = 0.0
+
+        # Reshape masked_patches back to video format if needed
+        # But actually, we will pass the masked patches through the encoder.
+        # If your visual encoder expects normal images, you'll need to reassemble them.
+        # For demonstration, let's reassemble into the original video shape:
+        masked_video = einops.rearrange(masked_patches, 
+                                        'bt np c ph pw -> bt c (ph npw) (pw nph)',
+                                        # This is tricky, we must remember how we took patches apart.
+                                        # We'll invert properly:
+                                        b=B, t=T, nh=num_patches_h, nw=num_patches_w, 
+                                        np=num_patches, ph=patch_size, pw=patch_size)
+        # Wait, the above rearrangement is complex. Let's do it step by step.
+        # We know np = nh * nw. The original shape was: b, t, nh*nw, c, ph, pw
+        # So we can do:
+        masked_patches = masked_patches.reshape(B, T, num_patches_h, num_patches_w, C, patch_size, patch_size)
+        masked_video = einops.rearrange(masked_patches, 
+                                        'b t nh nw c ph pw -> b c t (nh ph) (nw pw)')
+        
+        # masked_video is now a video with masked patches zeroed out.
+        # Return both the mask and the original patches for reconstruction
+        return masked_video, mask, patches  # patches are the original patches we need to reconstruct
 
     def compute_clip_loss_blip(self, image_feats_all, text_feat_all):
         sim_q2t = torch.einsum("if,tf->it", image_feats_all, text_feat_all)
@@ -176,6 +268,13 @@ class VideoModel(Blip2Base):
             feats = self.visual_encoder(video)
         feats = self.ln_vision(feats)
         feats = einops.rearrange(feats, '(b t) c h -> b (t c) h', b=batch_size, t=time_length)
+
+        # Add position embedding
+        if self.use_position_embeddings:
+            seq_len = feats.size(1)
+            pos_ids = torch.arange(seq_len, device=feats.device).unsqueeze(0).expand(B, -1)
+            feats = feats + self.video_position_embedding(pos_ids)
+
         output_video_feats = self.video_transformer(feats)
         output_video_feats = output_video_feats[:, -1, :]
         video_feats_clip = F.normalize(self.video_proj(output_video_feats), dim=-1)
@@ -189,12 +288,15 @@ class VideoModel(Blip2Base):
         return text_feats_clip
 
     def forward(self, samples):
-        video = samples['image']
-        video = video.cuda()
+        video = samples['image'].cuda()
+        text = samples['text_input']
+        
+        if self.use_reconstruction_loss:
+            video, mask, original_patches = self.mask_patches(video)
+        
         batch_size,_,time_length,_,_ = video.size()
         video = einops.rearrange(video, 'b c t h w -> (b t) c h w')
         
-        text = samples['text_input']
         with self.maybe_autocast():
             feats = self.visual_encoder(video)
             #print(feats.size()) # 16, 257, 1408
@@ -205,6 +307,20 @@ class VideoModel(Blip2Base):
         # TODO: Add positional embeddings
         output_video_feats = self.video_transformer(feats)
         output_video_feats = output_video_feats[:, -1, :]
+        
+        if self.use_reconstruction_loss:
+            masked_feats = output_video_feats[mask]
+            reconstructed_patches = self.reconstruction_decoder(masked_feats)
+            reconstructed_pixels = self.reconstruction_head(reconstructed_patches)
+            
+            ph, pw = 16, 16  # your patch size
+            reconstructed_pixels = reconstructed_pixels.view(-1, 3, ph, pw)
+
+            # original_patches[mask]: [#masked_positions, C, ph, pw]
+            target_pixels = original_patches[mask]
+
+            reconstruction_loss = F.mse_loss(reconstructed_pixels, target_pixels)
+
         video_feats_clip = F.normalize(self.video_proj(output_video_feats), dim=-1)
         #print(output_feats.size()) # 1, 4112, 1408
         #(feats-output_feats)
@@ -213,15 +329,25 @@ class VideoModel(Blip2Base):
         #embedding = self.token_embedding(tokens)
         #print(tokens)
         output_text_feats = self.text_transformer(tokens['input_ids'].cuda()).last_hidden_state
+        #print('output_text_feats: ', output_text_feats.size())
         output_text_feats = output_text_feats[:, -1, :]
+        #print('output_text_feats: ', output_text_feats.size())
         text_feats_clip = F.normalize(self.text_proj(output_text_feats), dim=-1)
+        #print('text_feats_clip: ', text_feats_clip.size())
         #video_feats_clip = video_feats_clip[:, -1, :]
         #text_feats_clip = text_feats_clip[:, -1, :]
         #print(text_feats_clip.size(), video_feats_clip.size())
         #print(video_feats_clip.size(), text_feats_clip.size())
         clip_loss, sim_i2t, sim_t2i = self.compute_clip_loss_blip(video_feats_clip, text_feats_clip)
         #print(clip_loss, sim_i2t, sim_t2i)
-        return {'loss': clip_loss}
+        
+        loss_dict = {'loss': clip_loss}
+
+        if self.use_reconstruction_loss:
+            loss_dict.update('reconstruction_loss', reconstruction_loss)
+            loss_dict.update('clip_loss', clip_loss)
+            loss_dict['loss'] += 0.1 * reconstruction_loss
+        return loss_dict
 
     @classmethod
     def from_config(cls, cfg):
@@ -262,8 +388,11 @@ class VideoModel(Blip2Base):
         use_clip_loss = cfg.get("use_clip_loss", False)
         use_generation_loss = cfg.get("use_generation_loss", False)
         use_itm_loss = cfg.get("use_itm_loss", True)
+        use_reconstruction_loss = cfg.get('use_reconstruction_loss', False)
         clip_dim_size = cfg.get("clip_dim_size", 256)
         num_videoq_hidden_layers = cfg.get('num_videoq_hidden_layers', 4)
+
+        use_position_embeddings = cfg.get('use_position_embeddings', False)
 
         model_type = cfg.get("model_type", None)
 
@@ -298,9 +427,11 @@ class VideoModel(Blip2Base):
             use_clip_loss = use_clip_loss,
             use_generation_loss = use_generation_loss,
             use_itm_loss = use_itm_loss,
+            use_reconstruction_loss = use_reconstruction_loss,
             clip_dim_size = clip_dim_size,
             model_type = model_type,
             num_videoq_hidden_layers = num_videoq_hidden_layers,
+            use_position_embeddings=use_position_embeddings,
         )
 
         ckpt_path = cfg.get("ckpt", "")  # load weights of MiniGPT-4
