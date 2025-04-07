@@ -62,7 +62,7 @@ class FineVideoDataset(BaseDataset):
             except StopIteration:
                 self.dataset = load_dataset(self.vis_root, streaming=True)
                 self.dataset_iter = iter(self.dataset['train'])
-                raise RuntimeError("No more videos in the dataset.")
+                #raise RuntimeError("No more videos in the dataset.")
             except Exception as e:
                 print(f"Failed to load video. Retrying... " + e)
 
@@ -109,8 +109,9 @@ class FineVideoDataset(BaseDataset):
 
             video_file = io.BytesIO(self.current_sample['mp4'])
             clip = self.vis_processor(video_file, start_timestamp, end_timestamp)
-
             self.activity_idx += 1
+            if clip.size(1) == 0:
+                continue
             caption = self.text_processor(description)
             #print(index, clip is None, caption, description)
             return {
@@ -122,7 +123,7 @@ class FineVideoDataset(BaseDataset):
 
     def __len__(self):
         # Fake
-        return 500000
+        return 5000000
         #raise NotImplementedError("Length is not available in streaming mode.")
 
 
@@ -458,4 +459,4 @@ if __name__ == '__main__':
     #print(len(dataset))
     for i in range(1000):
         data = dataset[i]
-        print(i)
+        print(i, data["texts"])
