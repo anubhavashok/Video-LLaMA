@@ -272,7 +272,7 @@ class VideoModel(Blip2Base):
         # Add position embedding
         if self.use_position_embeddings:
             seq_len = feats.size(1)
-            pos_ids = torch.arange(seq_len, device=feats.device).unsqueeze(0).expand(B, -1)
+            pos_ids = torch.arange(seq_len, device=feats.device).unsqueeze(0).expand(batch_size, -1)
             feats = feats + self.video_position_embedding(pos_ids)
 
         output_video_feats = self.video_transformer(feats)
@@ -305,6 +305,10 @@ class VideoModel(Blip2Base):
         feats = einops.rearrange(feats, '(b t) c h -> b (t c) h', b=batch_size, t=time_length)
         #print(feats.size()) # 1, (16*257), 1408
         # TODO: Add positional embeddings
+        if self.use_position_embeddings:
+            seq_len = feats.size(1)
+            pos_ids = torch.arange(seq_len, device=feats.device).unsqueeze(0).expand(batch_size, -1)
+            feats = feats + self.video_position_embedding(pos_ids)
         output_video_feats = self.video_transformer(feats)
         output_video_feats = output_video_feats[:, -1, :]
         
