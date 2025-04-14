@@ -22,7 +22,7 @@ import torch.backends.cudnn as cudnn
 
 import video_llama.tasks as tasks
 from video_llama.common.config import Config
-from video_llama.common.dist_utils import get_rank, init_distributed_mode
+from video_llama.common.dist_utils import get_rank, init_distributed_mode, is_main_process
 from video_llama.common.logger import setup_logger
 from video_llama.common.optims import (
     LinearWarmupCosineLRScheduler,
@@ -38,6 +38,8 @@ from video_llama.processors import *
 from video_llama.runners import *
 from video_llama.tasks import *
 
+import wandb
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training")
@@ -51,10 +53,15 @@ def parse_args():
         "change to --cfg-options instead.",
     )
     parser.add_argument("--local-rank", type=int, default=0)
+    parser.add_argument("--exp-name", type=str, default=None)#str(now()))
 
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
+
+    if args.exp_name is None:
+        args.exp_name = os.path.splitext(os.path.basename(args.cfg_path))[0]
+        print(f'Exp name not set, setting it to: {args.exp_name}')
 
     return args
 
@@ -86,7 +93,9 @@ def main():
     # set before init_distributed_mode() to ensure the same job_id shared across all ranks.
     job_id = now()
 
-    cfg = Config(parse_args())
+    args = parse_args()
+
+    cfg = Config(args)
 
     init_distributed_mode(cfg.run_cfg)
 
@@ -94,6 +103,8 @@ def main():
 
     # set after init_distributed_mode() to only log on master.
     setup_logger()
+    if is_main_process():
+        wandb.init(project="video_embeddings", name=args.exp_name)
 
     cfg.pretty_print()
 
