@@ -15,6 +15,7 @@ import torch.distributed as dist
 
 from video_llama.common import dist_utils
 
+import wandb
 
 class SmoothedValue(object):
     """Track a series of values and provide access to smoothed values over a
@@ -88,7 +89,7 @@ class MetricLogger(object):
         for k, v in kwargs.items():
             if isinstance(v, torch.Tensor):
                 v = v.item()
-            assert isinstance(v, (float, int))
+            assert isinstance(v, (float, int)), f"Value for {k} must be float or int."
             self.meters[k].update(v)
 
     def __getattr__(self, attr):
@@ -103,13 +104,13 @@ class MetricLogger(object):
     def __str__(self):
         loss_str = []
         for name, meter in self.meters.items():
-            loss_str.append("{}: {}".format(name, str(meter)))
+            loss_str.append(f"{name}: {str(meter)}")
         return self.delimiter.join(loss_str)
 
     def global_avg(self):
         loss_str = []
         for name, meter in self.meters.items():
-            loss_str.append("{}: {:.4f}".format(name, meter.global_avg))
+            loss_str.append(f"{name}: {meter.global_avg:.4f}")
         return self.delimiter.join(loss_str)
 
     def synchronize_between_processes(self):
@@ -144,6 +145,7 @@ class MetricLogger(object):
             data_time.update(time.time() - end)
             yield obj
             iter_time.update(time.time() - end)
+            # Print metrics
             if i % print_freq == 0 or i == len(iterable) - 1:
                 eta_seconds = iter_time.global_avg * (len(iterable) - i)
                 eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
@@ -170,14 +172,27 @@ class MetricLogger(object):
                             data=str(data_time),
                         )
                     )
+
+                if wandb.run is not None and dist_utils.is_main_process():
+                    # Prepare a dictionary of current values to log
+                    metrics_dict = {}
+                    for name, meter in self.meters.items():
+                        # Log both average and latest value if you like
+                        metrics_dict[f"{name}/value"] = meter.value
+                        metrics_dict[f"{name}/global_avg"] = meter.global_avg
+                    # We also log iteration/time if desired
+                    metrics_dict["iteration"] = i
+                    # Actually log to wandb
+                    wandb.log(metrics_dict)
+
             i += 1
             end = time.time()
+
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         print(
-            "{} Total time: {} ({:.4f} s / it)".format(
-                header, total_time_str, total_time / len(iterable)
-            )
+            f"{header} Total time: {total_time_str} "
+            f"({total_time / len(iterable):.4f} s / it)"
         )
 
 
