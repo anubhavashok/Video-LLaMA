@@ -18,13 +18,14 @@ import decord
 from decord import VideoReader
 import random
 import torch
-from torch.utils.data.dataloader import default_collate
+from torch.utils.data.dataloader import DataLoader, default_collate
 import json
 import transformers
 from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaTokenizer
 import copy
 from datasets import load_dataset
 import io
+from pathlib import Path
 
 class FineVideoDataset(BaseDataset):
     def __init__(self, vis_processor, text_processor, vis_root, ann_root):
@@ -113,6 +114,7 @@ class FineVideoDataset(BaseDataset):
             if clip.size(1) == 0:
                 continue
             caption = self.text_processor(description)
+            print(f'caption: {caption}\ndescription: {description}')
             #print(index, clip is None, caption, description)
             return {
                 "image": clip,
@@ -126,6 +128,111 @@ class FineVideoDataset(BaseDataset):
         return 5000000
         #raise NotImplementedError("Length is not available in streaming mode.")
 
+class FineVideoActivityDataset(BaseDataset):
+    """
+    One dataset item  ==  one *video*.
+    ───────────────────────────────────
+    • ``sample["image"]``  →  List[Tensor]                   (len = #activities)
+         each Tensor shape (C, T, H, W)
+    • ``sample["text_input"]``  →  List[str]   (tokenised captions)
+    • ``sample["texts"]``       →  List[str]   (raw descriptions)
+
+    This structure lines up with the HierarchicalModel forward pass you just built:
+      outer list (produced by DataLoader) = batch dimension B
+      inner list                           = varying #clips NCᵢ
+    """
+
+    def __init__(self, vis_processor, text_processor, vis_root, ann_root=None):
+        super().__init__(vis_processor=vis_processor,
+                         text_processor=text_processor)
+
+        self.vis_root       = Path(vis_root)
+        self.dataset        = load_dataset(self.vis_root.as_posix(),
+                                           streaming=True)  # returns an iterable
+        self.dataset_iter   = iter(self.dataset["train"])
+
+        self.vis_processor  = vis_processor
+        self.text_processor = text_processor
+
+    # ------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------
+    @staticmethod
+    def _timestamp_to_sec(ts: str) -> float:
+        # "HH:MM:SS.mmm"  →  seconds.float
+        h, m, s = ts.split(":")
+        s, ms   = s.split(".")
+        return (int(h)*3600 + int(m)*60 + int(s) + int(ms)/1_000)
+
+    def _next_video(self):
+        """Pull the next sample (video) from the streaming iterator."""
+        retries = 10
+        for _ in range(retries):
+            try:
+                return next(self.dataset_iter)
+            except StopIteration:                       # epoch exhausted → restart
+                self.dataset_iter = iter(self.dataset["train"])
+            except Exception as e:                      # corrupted sample → skip
+                print("Error loading video, retrying:", e)
+        raise RuntimeError("Too many consecutive video-loading errors.")
+
+    # ------------------------------------------------------------
+    # main entry
+    # ------------------------------------------------------------
+    def __getitem__(self, idx):
+        """Ignore idx (streaming). Return all valid activity-clips of one video."""
+        while True:                                     # keep trying until a video yields ≥1 clip
+            sample = self._next_video()
+            clip_list, caption_list, raw_texts = [], [], []
+
+            desc = sample["json"]["content_metadata"].get("description", None)
+            # TODO: See what the variance between scenes is and if its ok to compute all.
+            # TODO: Also skip scene if timestamp is invalid for any activity.
+            for scene in sample["json"]["content_metadata"]["scenes"]:
+                if desc is None:
+                    continue
+                for act in scene["activities"]:
+                    ts   = act.get("timestamp", None)
+                    t0 = self._timestamp_to_sec(ts["start_timestamp"])
+                    t1 = self._timestamp_to_sec(ts["end_timestamp"])
+                    if t1 <= t0 + 3.5:                         # bad timestamp pair
+                        continue
+                    try:
+                        video_file = io.BytesIO(sample["mp4"])
+                        clip = self.vis_processor(video_file, t0, t1)
+                    except Exception as e:
+                        print('Error in processing')
+                        continue
+                    if clip is None or clip.numel() == 0:
+                        continue
+
+                    clip_list   += [clip]                               # (C,T,H,W)
+                    caption_list += [self.text_processor(desc)]
+            raw_texts    += [desc]
+
+            if clip_list:  # at least one good activity
+                return {
+                    "image":       clip_list,       # List[Tensor]
+                    "text_input":  caption_list,    # List[str] (tokenised later)
+                    "texts":       raw_texts,       # List[str]
+                    "type":        "video",
+                }
+            # otherwise try next video
+
+    def collater(self, batch):
+        """
+        Identity-style collate that keeps the ragged list structure.
+        Assumes every item in `batch` is a dict produced by __getitem__.
+        """
+        collated = {}
+        for key in batch[0]:
+            # collect a *list* of that key across the batch
+            collated[key] = [item[key] for item in batch]
+        return collated
+
+    def __len__(self):
+        # dummy large value – length is undefined in streaming mode
+        return 50_000_000
 
 class ValleyInstructDataset(BaseDataset):
     def __init__(self, vis_processor, text_processor, vis_root, ann_root, num_video_query_token=32, tokenizer_name = '/mnt/workspace/ckpt/vicuna-13b/', data_type = 'video', model_type='vicuna'):
@@ -455,7 +562,14 @@ if __name__ == '__main__':
     ann_root = ''
     vis_processor = AlproVideoTrainProcessor(n_frms=16)
     text_processor = BaseProcessor()
-    dataset = FineVideoDataset(vis_processor, text_processor, vis_root, ann_root)
+    dataset = FineVideoActivityDataset(vis_processor, text_processor, vis_root, ann_root)
+    loader = DataLoader(
+        dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=1,
+        collate_fn=dataset.collater      # ← points to the method you just added
+    )
     #print(len(dataset))
     for i in range(1000):
         data = dataset[i]

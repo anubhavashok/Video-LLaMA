@@ -10,7 +10,7 @@ from video_llama.datasets.datasets.kinetics_datasets import KineticsDataset
 from video_llama.datasets.datasets.msrvtt_datasets import MSRVTTDataset
 from video_llama.datasets.datasets.msvd_datasets import MSVDDataset
 from video_llama.datasets.datasets.valley_datasets import ValleyDataset
-from video_llama.datasets.datasets.finevideo_datasets import FineVideoDataset
+from video_llama.datasets.datasets.finevideo_datasets import FineVideoDataset, FineVideoActivityDataset
 from video_llama.datasets.datasets.videochatgptcaptions_datasets import VideoChatGPTCaptionsDataset
 
 @registry.register_builder("webvid")
@@ -221,6 +221,34 @@ class FineVideoBuilder(BaseDatasetBuilder):
         split = "train"
 
         build_info = self.config.build_info
+        dataset_cls = self.train_dataset_cls
+        datasets[split] = dataset_cls(
+            vis_processor=self.vis_processors[split],
+            text_processor=self.text_processors[split],
+            vis_root=build_info.videos_dir,
+            ann_root=build_info.anno_dir
+        )
+
+        return datasets
+
+@registry.register_builder("finevideo_activity")
+class FineVideoActivityBuilder(BaseDatasetBuilder):
+    train_dataset_cls = FineVideoActivityDataset
+    DATASET_CONFIG_DICT = {"default": "configs/datasets/finevideo_activity/defaults.yaml"}
+    
+    def _download_ann(self):
+        pass
+
+    def _download_vis(self):
+        pass
+
+    def build(self):
+        self.build_processors()
+        datasets = dict()
+        split = "train"
+
+        build_info = self.config.build_info
+        print("build_info: ", build_info)
         dataset_cls = self.train_dataset_cls
         datasets[split] = dataset_cls(
             vis_processor=self.vis_processors[split],
