@@ -16,6 +16,7 @@ from video_llama.models.blip2 import Blip2Base
 from video_llama.models.video_llama import VideoLLAMA
 from video_llama.processors.base_processor import BaseProcessor
 from video_llama.models.vm import VideoModel
+from video_llama.models.vm_with_lora import VideoModelLoRA
 from video_llama.models.hierarchical_model import HierarchicalModel
 
 
@@ -25,6 +26,7 @@ __all__ = [
     "Blip2Base",
     "VideoLLAMA",
     "VideoModel",
+    "VideoModelLoRA",
     "HierarchicalModel"
 ]
 
