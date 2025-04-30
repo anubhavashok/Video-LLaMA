@@ -76,10 +76,12 @@ class VideoModel(Blip2Base):
         num_videoq_hidden_layers = 4,
         model_type = None,
         freeze_lm = False,
-        use_reconstruction_loss = True,
+        use_reconstruction_loss = False, #True,
         mask_ratio = 0.75,
         reconstruction_hidden_dim = 512,
         use_position_embeddings=False,
+        num_video_transformer_layers = 6,
+        num_video_transformer_heads = 4,
     ):
         super().__init__()
 
@@ -103,13 +105,16 @@ class VideoModel(Blip2Base):
             logging.info("freeze vision encoder")
         print('Loading VIT Done')
 
-        num_heads = 4
-        num_layers = 6
+        num_heads = num_video_transformer_heads#4
+        num_layers = num_video_transformer_layers#6
         #num_patches = 1+self.visual_encoder.patch_size**2
+        # TODO: Update video transformer with timesformer
+        #self.video_processor = AutoImageProcessor.from_pretrained("/Users/bhavashok/models/timesformer-hr-finetuned-k600")
+        #self.video_transformer = TimesformerForVideoClassification.from_pretrained("/Users/bhavashok/models/timesformer-hr-finetuned-k600")
         video_encoder_layer = TransformerEncoderLayer(d_model=self.visual_encoder.num_features, nhead=num_heads, dim_feedforward=self.visual_encoder.num_features, batch_first=True)
         self.video_transformer = TransformerEncoder(video_encoder_layer, num_layers=num_layers)
-        #self.text_embedding_model = 'sentence-transformers/all-MiniLM-L6-v2'
-        self.text_embedding_model = 'mixedbread-ai/mxbai-embed-large-v1'
+        self.text_embedding_model = 'sentence-transformers/all-MiniLM-L6-v2'
+        #self.text_embedding_model = 'mixedbread-ai/mxbai-embed-large-v1'
         self.text_tokenizer = AutoTokenizer.from_pretrained(self.text_embedding_model)
         self.text_transformer = AutoModel.from_pretrained(self.text_embedding_model)
         
@@ -126,8 +131,8 @@ class VideoModel(Blip2Base):
         #self.video_transformer = Transformer(d_model=self.visual_encoder.num_features, nhead=num_heads, dim_feedforward=self.visual_encoder.num_features)
         clip_dim = 1024
         self.video_proj = nn.Linear(self.visual_encoder.num_features, clip_dim)
-        #self.text_proj = nn.Linear(384, clip_dim)
-        self.text_proj = nn.Linear(1024, clip_dim)
+        self.text_proj = nn.Linear(384, clip_dim)
+        #self.text_proj = nn.Linear(1024, clip_dim)
         init_logit_scale = 0.07
         self.temperature_parameter = nn.Parameter(torch.ones([]) * init_logit_scale)
         self.temperature_parameter.requires_grad = True
@@ -397,6 +402,8 @@ class VideoModel(Blip2Base):
         num_videoq_hidden_layers = cfg.get('num_videoq_hidden_layers', 4)
 
         use_position_embeddings = cfg.get('use_position_embeddings', False)
+        num_video_transformer_layers = cfg.get('num_video_transformer_layers', 6)
+        num_video_transformer_heads = cfg.get('num_video_transformer_heads', 4)
 
         model_type = cfg.get("model_type", None)
 
@@ -436,6 +443,8 @@ class VideoModel(Blip2Base):
             model_type = model_type,
             num_videoq_hidden_layers = num_videoq_hidden_layers,
             use_position_embeddings=use_position_embeddings,
+            num_video_transformer_layers=num_video_transformer_layers,
+            num_video_transformer_heads=num_video_transformer_heads,
         )
 
         ckpt_path = cfg.get("ckpt", "")  # load weights of MiniGPT-4
