@@ -17,6 +17,7 @@ from video_llama.models.video_llama import VideoLLAMA
 from video_llama.processors.base_processor import BaseProcessor
 from video_llama.models.vm import VideoModel
 from video_llama.models.vm_with_lora import VideoModelLoRA
+from video_llama.models.vm_with_decompression import VideoModelDecomp
 from video_llama.models.hierarchical_model import HierarchicalModel
 
 
@@ -27,7 +28,8 @@ __all__ = [
     "VideoLLAMA",
     "VideoModel",
     "VideoModelLoRA",
-    "HierarchicalModel"
+    "HierarchicalModel",
+    "VideoModelDecomp",
 ]
 
 
