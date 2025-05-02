@@ -88,6 +88,12 @@ class VideoModelLoRA(Blip2Base):
         with self.maybe_autocast():
             return self.model(*args, **kwargs)
 
+    def encode_video(self, *args, **kwargs):
+        return self.model.encode_video(*args, **kwargs)
+
+    def encode_text(self, *args, **kwargs):
+        return self.model.encode_text(*args, **kwargs)
+
     def merge_adapters_and_unload(self):
         """Fuse LoRA weights back into the backbone for inference."""
         from peft import merge_adapter
