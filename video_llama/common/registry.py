@@ -98,11 +98,12 @@ class Registry:
                 model_cls, BaseModel
             ), "All models must inherit BaseModel class"
             if name in cls.mapping["model_name_mapping"]:
-                raise KeyError(
-                    "Name '{}' already registered for {}.".format(
-                        name, cls.mapping["model_name_mapping"][name]
-                    )
-                )
+                #raise KeyError(
+                #    "Name '{}' already registered for {}.".format(
+                #        name, cls.mapping["model_name_mapping"][name]
+                #    )
+                #)
+                return model_cls
             cls.mapping["model_name_mapping"][name] = model_cls
             return model_cls
 
