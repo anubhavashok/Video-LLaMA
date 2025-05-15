@@ -5,11 +5,12 @@ import sys
 sys.path.insert(0, '/home/bhavashok/Video-LLaMA')
 from video_llama.common.registry import registry
 from video_llama.models.vm import VideoModel
-from video_llama.models.blip2 import Blip2Base, disabled_train
+from video_llama.models.blip2 import Blip2Base, disabled_train, restore_train
 from argparse import Namespace
 from video_llama.common.config import Config
 from torch.nn import functional as F
 from typing import Optional
+import wandb
 
 """
 Video-LLAMA + Decompression
@@ -104,16 +105,28 @@ class VideoModelDecomp(Blip2Base):
                 'gpu_id': 0}
         cfg = Config(Namespace(**args))
         self.model = VideoModel.from_config(cfg.model_cfg)
-        self.model.eval()                     # keep it in eval mode
+        self.model.eval()
+        # keep it in eval mode
 
         # 2. TODO: initialize decompression module -----------------------------
-        self.decompression_module = DecompressionNet()
+        self.decompression_module = DecompressionNet(num_frames=16, in_dim=self.model.video_proj.out_features)
         self._loss_fn = nn.MSELoss()
 
         # 4. (optional) freeze everything except LoRA ------------------------
         if freeze_base:
             for n, p in self.model.named_parameters():
                 p.requires_grad_(False)
+        else:
+            for name, param in self.model.named_parameters():
+                param.requires_grad = True
+            for name, param in self.model.visual_encoder.named_parameters():
+                param.requires_grad = True
+            restore_train(self.model.visual_encoder)
+            self.model.visual_encoder = self.model.visual_encoder.train()
+            for name, param in self.model.ln_vision.named_parameters():
+                param.requires_grad = True
+            restore_train(self.model.ln_vision)
+            self.model.ln_vision = self.model.ln_vision.train()
 
     def loss_fn(self, pred, target):
         return self._loss_fn(pred, target)
@@ -134,6 +147,7 @@ class VideoModelDecomp(Blip2Base):
             feat = self.compress(original_video)
             output_video = self.decompress(feat)
             loss = self.loss_fn(output_video, original_video)
+            wandb.log({"first_output_frame_28x28": wandb.Image(output_video[0, :, 0, :, :], mode='RGB')})
         return {"loss": loss}
 
     @classmethod
