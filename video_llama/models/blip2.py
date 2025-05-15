@@ -10,6 +10,7 @@ import logging
 import os
 import time
 import datetime
+import types
 
 import torch
 import torch.nn as nn
@@ -102,6 +103,13 @@ def disabled_train(self, mode=True):
     does not change anymore."""
     return self
 
+def restore_train(model: nn.Module):
+    """
+    Re-attach nn.Module.train to `model` and all its children, in-place.
+    """
+    for m in model.modules():
+        # walk the whole tree
+        m.train = types.MethodType(nn.Module.train, m)
 
 class LayerNorm(nn.LayerNorm):
     """Subclass torch's LayerNorm to handle fp16."""
