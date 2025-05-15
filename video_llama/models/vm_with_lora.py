@@ -94,6 +94,15 @@ class VideoModelLoRA(Blip2Base):
     def encode_text(self, *args, **kwargs):
         return self.model.encode_text(*args, **kwargs)
 
+    def forward_selection(self, video, selection_texts, threshold=0.5):
+        video_emb = self.model.encode_video(video)
+        for text in selection_texts:
+            text_emb = self.model.encode_text(text)
+            score = compute_score(video_emb, text_emb)
+            if score > threshold:
+                return True
+        return False
+
     def merge_adapters_and_unload(self):
         """Fuse LoRA weights back into the backbone for inference."""
         from peft import merge_adapter
