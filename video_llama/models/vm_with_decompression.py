@@ -53,23 +53,44 @@ class DecompressionNet(nn.Module):
         # three upsampling stages ⇒ scale‑factor 2³ = 8.
         # 14 (ViT‑B) · 8 ≃ 224 – we land exactly back on the original res.
         self.decoder = nn.Sequential(
-            nn.ConvTranspose3d(1, 128, kernel_size=(1, 2, 2), stride=(1, 2, 2)),
+            nn.ConvTranspose3d(4096, 128, kernel_size=(1, 2, 2), stride=(1, 2, 2)),
+            nn.BatchNorm3d(128),
             nn.GELU(),
             nn.ConvTranspose3d(128, 64, kernel_size=(1, 2, 2), stride=(1, 2, 2)),
+            nn.BatchNorm3d(64),
             nn.GELU(),
             nn.ConvTranspose3d(64, 32, kernel_size=(1, 2, 2), stride=(1, 2, 2)),
+            nn.BatchNorm3d(32),
             nn.GELU(),
             nn.ConvTranspose3d(32, out_channels, kernel_size=(1, 2, 2), stride=(1, 2, 2)),
             nn.Tanh(),
         )
+        self.apply(self._init_weights)
+    
+    @staticmethod
+    def _init_weights(m: nn.Module) -> None:
+        if isinstance(m, (nn.ConvTranspose3d, nn.Linear)):
+            nn.init.xavier_uniform_(m.weight, gain=0.9)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # x: [B, N, C]
-        B, N = x.shape
-        x = self.proj(x)  # [B, N, hidden]
+        B, L, C = x.shape              # L = T * 257
+        T = self.num_frames # 16
+        x = x.view(B, T, 257, C)   # [B, T, 257, C]
+
+        patch_feats = x[:, :, 1:, :]   # drop the CLS slot of every frame
+        patch_feats = patch_feats.reshape(B, T * 256, C)  # [B, 4096, C]
+
+        #B, N, C = x.shape
+        x = self.proj(patch_feats)  # [B, C, N, hidden]
         #x = x.transpose(1, 2)  # [B, hidden, N]
         #print(x.size())
-        x = x.view(B, -1, self.num_frames, self.patch_h, self.patch_w)
+        x = x.view(B, self.num_frames, self.patch_h, self.patch_w, -1)
+        #x = x.view(B, -1, self.num_frames, self.patch_h, self.patch_w)
         #print(x.size())
+        x = x.permute(0, 4, 1, 2, 3).contiguous()
         x = self.decoder(x)  # [B, 3, T, H, W]
         #print(x.size())
         return x
@@ -110,7 +131,8 @@ class VideoModelDecomp(Blip2Base):
 
         # 2. TODO: initialize decompression module -----------------------------
         self.decompression_module = DecompressionNet(num_frames=16, in_dim=self.model.video_proj.out_features)
-        self._loss_fn = nn.MSELoss()
+        #self._loss_fn = nn.MSELoss()
+        self._loss_fn = nn.L1Loss()
 
         # 4. (optional) freeze everything except LoRA ------------------------
         if freeze_base:
@@ -119,23 +141,24 @@ class VideoModelDecomp(Blip2Base):
         else:
             for name, param in self.model.named_parameters():
                 param.requires_grad = True
+            restore_train(self.model)
             for name, param in self.model.visual_encoder.named_parameters():
-                param.requires_grad = True
-            restore_train(self.model.visual_encoder)
-            self.model.visual_encoder = self.model.visual_encoder.train()
-            for name, param in self.model.ln_vision.named_parameters():
-                param.requires_grad = True
-            restore_train(self.model.ln_vision)
-            self.model.ln_vision = self.model.ln_vision.train()
+                param.requires_grad = False
+            #restore_train(self.model.visual_encoder)
+            #self.model.visual_encoder = self.model.visual_encoder.train()
+            #for name, param in self.model.ln_vision.named_parameters():
+            #    param.requires_grad = True
+            #restore_train(self.model.ln_vision)
+            #self.model.ln_vision = self.model.ln_vision.train()
 
     def loss_fn(self, pred, target):
         return self._loss_fn(pred, target)
 
-    
     def compress(self, video):
-        return self.model.encode_video(video)
+        return self.model.encode_video(video, return_full=True)
     
     def decompress(self, feat):
+        print('feature size: ', feat.size())
         return self.decompression_module(feat)
 
     # --------------------------------------------------------------------- #
@@ -147,6 +170,8 @@ class VideoModelDecomp(Blip2Base):
             feat = self.compress(original_video)
             output_video = self.decompress(feat)
             loss = self.loss_fn(output_video, original_video)
+            #print('output_video: ', output_video[0, :, 0, :, :])
+            #print('input_video: ', original_video[0, :, 0, :, :])
             wandb.log({"first_output_frame_28x28": wandb.Image(output_video[0, :, 0, :, :], mode='RGB')})
         return {"loss": loss}
 
