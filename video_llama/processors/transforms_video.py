@@ -18,6 +18,7 @@ from torchvision.transforms import (
 import video_llama.processors.functional_video as F
 import torchvision
 
+import torch
 
 __all__ = [
     "RandomCropVideo",
@@ -25,6 +26,7 @@ __all__ = [
     "CenterCropVideo",
     "ResizedCenterCropVideo",
     "NormalizeVideo",
+    "UnNormalizeVideo",
     "ToTensorVideo",
     "RandomHorizontalFlipVideo",
 ]
@@ -170,6 +172,46 @@ class NormalizeVideo:
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(mean={self.mean}, std={self.std}, inplace={self.inplace})"
 
+class UnNormalizeVideo:
+    """
+    Reverse a (mean, std) normalization applied to a video tensor.
+    Args:
+        mean (3-tuple or list): RGB means that were subtracted during normalization
+        std  (3-tuple or list): RGB std-devs that were divided during normalization
+        inplace (bool): operate in-place (slightly faster, mutates the input)
+    """
+
+    def __init__(self, mean=None, std=None, inplace: bool = False):
+        if mean is None:
+            mean = (0.48145466, 0.4578275, 0.40821073)
+        if std is None:
+            std = (0.26862954, 0.26130258, 0.27577711)
+
+        self.mean = mean
+        self.std = std
+        self.inplace = inplace
+
+    def __call__(self, clip):
+        """
+        Args:
+            clip (torch.Tensor): (B, C, T, H, W) tensor that has already been normalized.
+        Returns:
+            torch.Tensor: un-normalized tensor in the same shape.
+        """
+        # Reshape for broadcasting: (C, 1, 1, 1)
+        mean = torch.as_tensor(self.mean, dtype=clip.dtype,
+                               device=clip.device).view(1, -1, 1, 1, 1)
+        std = torch.as_tensor(self.std, dtype=clip.dtype,
+                              device=clip.device).view(1, -1, 1, 1, 1)
+
+        if self.inplace:
+            clip.mul_(std).add_(mean)
+            return clip
+        else:
+            return clip * std + mean
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(mean={self.mean}, std={self.std}, inplace={self.inplace})"
 
 class ToTensorVideo:
     """
